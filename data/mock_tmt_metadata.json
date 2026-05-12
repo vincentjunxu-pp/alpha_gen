@@ -1,0 +1,248 @@
+{
+  "dataset": "mock_tmt_daily.parquet",
+  "format": "parquet",
+  "compression": "zstd",
+  "index": [
+    "Datetime",
+    "Contract"
+  ],
+  "shape": [
+    48000,
+    28
+  ],
+  "n_dates": 600,
+  "n_contracts": 80,
+  "start": "2023-01-03 15:00:00",
+  "end": "2025-04-21 15:00:00",
+  "notes": [
+    "Mock daily TMT stock panel for local debugging only.",
+    "Datetime uses 15:00:00 to satisfy alpha_gen pivot validation.",
+    "market_cap is stored as log market cap and should not be logged again inside alpha_gen.",
+    "Fundamental fields are quarterly values with a 20-business-day disclosure lag, then forward-filled to daily.",
+    "label_20d is future 20-trading-day return and should be used only as the training label."
+  ],
+  "numeric_fields": [
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "amount",
+    "turnover",
+    "market_cap",
+    "enterprise_value",
+    "book_equity",
+    "total_assets",
+    "revenue_mrq",
+    "revenue_ttm",
+    "operating_profit_mrq",
+    "operating_profit_ttm",
+    "net_profit_mrq",
+    "net_profit_ttm",
+    "rd_expense_ttm",
+    "capex_ttm",
+    "free_cash_flow_ttm",
+    "forecast_revenue_ry",
+    "forecast_net_profit_ry",
+    "rating_score_30d",
+    "rating_score_90d",
+    "rating_score_180d",
+    "is_tradeable",
+    "label_20d"
+  ],
+  "categorical_fields": [
+    "industry_code"
+  ],
+  "field_rules": {
+    "close": {
+      "can_y": false,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": false,
+      "allow_lag": false,
+      "allow_diff": false,
+      "allow_pct": true,
+      "allow_std": true
+    },
+    "market_cap": {
+      "can_y": false,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": true
+    },
+    "enterprise_value": {
+      "can_y": false,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": false,
+      "allow_pct": false,
+      "allow_std": false
+    },
+    "rating_score_30d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": true
+    },
+    "rating_score_90d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": true
+    },
+    "rating_score_180d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": true
+    },
+    "book_equity": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "total_assets": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "revenue_mrq": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "revenue_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "operating_profit_mrq": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "operating_profit_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "net_profit_mrq": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "net_profit_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "rd_expense_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "capex_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "free_cash_flow_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "forecast_revenue_ry": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    },
+    "forecast_net_profit_ry": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": true,
+      "allow_current": true,
+      "allow_lag": true,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false
+    }
+  }
+}

@@ -1,0 +1,371 @@
+<!DOCTYPE html><html><head>
+      <title>ga_factor_mining_report</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\xwj2003\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.25\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      
+      
+      
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-details{margin:0;padding:0;border:none}.markdown-preview .md-toc summary.md-toc-link-wrapper{cursor:pointer;list-style-position:outside}.markdown-preview .md-toc summary.md-toc-link-wrapper::marker{font-size:.85em}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='0']{margin-left:12px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='1']{margin-left:28px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='2']{margin-left:44px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='3']{margin-left:60px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='4']{margin-left:76px}.markdown-preview .md-toc .md-toc-link-wrapper[data-level='5']{margin-left:80px}.markdown-preview a.tag,.markdown-preview a.tag:active,.markdown-preview a.tag:link,.markdown-preview a.tag:visited,.markdown-preview span.tag{display:inline-block;background-color:var(--vscode-badge-background,rgba(127,127,127,.18));color:var(--vscode-badge-foreground,currentColor);border-radius:2em;font-size:.85em;font-weight:500;padding:.05em .55em;line-height:1.5;white-space:nowrap;text-decoration:none;text-shadow:none;box-shadow:none;transition:background-color .12s ease,opacity .12s ease}.markdown-preview a.tag{cursor:pointer}.markdown-preview a.tag:focus,.markdown-preview a.tag:hover{background-color:var(--vscode-badge-background,rgba(127,127,127,.32));color:var(--vscode-badge-foreground,currentColor);opacity:.85;text-decoration:none;outline:0}.markdown-preview .wikilink-embed-content{border-left:3px solid var(--vscode-textBlockQuote-border,rgba(128,128,128,.3));background:var(--vscode-textBlockQuote-background,rgba(128,128,128,.05));margin:.5em 0;padding:.5em .75em;border-radius:0 3px 3px 0}.markdown-preview .wikilink-embed-content.wikilink-embed-error{border-left-color:var(--vscode-errorForeground,#cf222e);color:var(--vscode-errorForeground,#cf222e);font-style:italic;opacity:.8}.markdown-preview .wikilink-embed-content h1:first-child,.markdown-preview .wikilink-embed-content h2:first-child,.markdown-preview .wikilink-embed-content h3:first-child,.markdown-preview .wikilink-embed-content h4:first-child,.markdown-preview .wikilink-embed-content h5:first-child,.markdown-preview .wikilink-embed-content h6:first-child{margin-top:.25em}.markdown-preview .wikilink-embed-content .wikilink-embed-content{margin:.25em 0;padding:.25em .5em}.markdown-preview .block-id{display:none}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-details{margin:0;padding:0;border:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='0']{padding-left:0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='1']{padding-left:16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='2']{padding-left:32px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='3']{padding-left:48px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='4']{padding-left:64px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper[data-level='5']{padding-left:80px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+    </head>
+    <body for="html-export">
+      <div class="crossnote markdown-preview  ">
+      
+<h1 id="基于遗传算法的-tmt-基本面因子挖掘项目汇报">基于遗传算法的 TMT 基本面因子挖掘项目汇报 </h1>
+<h2 id="0-摘要">0. 摘要 </h2>
+<p>对 <code>TMT 股票池</code>的<code>基本面因子</code>进行结构化遗传算法搜索，挖掘对未来收益有稳定解释力的因子表达式。遗传算法训练阶段以未来 <strong>20 个交易日收益</strong> 的截面 <strong>RankIC</strong> 表现作为核心目标之一，同时结合 IC 胜率和 NDCG 约束；正式回测阶段使用 <strong>2021-01-01 至 2024-01-01</strong> 作为验证期，并与 label 周期保持一致，采用 <strong>20 个交易日调仓频率</strong>。</p>
+<p>当前结果显示，除第 0 个因子方向为负以外，其余入选因子大多呈现稳定正向 RankIC、明显的多空分层和较高的 long-short 夏普。表现最突出的因子集中在盈利质量、盈利能力相对估值、营运资本残差、递延收入/偿债现金流残差等方向。</p>
+<ul>
+<li>训练与回测口径已经统一为 <strong>未来 20D label + 20D 调仓</strong>，避免了 label 周期与交易周期不一致的问题。</li>
+<li>回测中大部分正向因子 <code>ric_20d</code> 集中在 <strong>0.085 到 0.103</strong>，<code>rir_20d</code> 多数高于 <strong>0.70</strong>。</li>
+<li>多空组合表现较强，多个因子 <code>longshort_sharpe</code> 超过 <strong>7</strong>，其中因子 2、3、10 的多空表现最突出。</li>
+<li>分组收益具备清晰单调性，高分组明显跑赢低分组，说明因子排序信息有效。</li>
+</ul>
+<h2 id="1-项目思路与流程">1. 项目思路与流程 </h2>
+<p>通过参数化遗传算法，在基本面字段上搜索结构化表达式，并在表达式生成后统一进行市值中性化。</p>
+<h3 id="11-表达式搜索空间">1.1 表达式搜索空间 </h3>
+<p>当前遗传算法支持以下五类表达式结构：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>表达式结构</th>
+<th>经济含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>single</code></td>
+<td><code>A</code></td>
+<td>单字段信号，例如利润、现金流、资本开支等</td>
+</tr>
+<tr>
+<td><code>ratio</code></td>
+<td><code>A / B</code></td>
+<td>相对强度或估值归一化</td>
+</tr>
+<tr>
+<td><code>pair_ratio</code></td>
+<td><code>(A +/- B) / (C +/- D)</code></td>
+<td>复合比值结构</td>
+</tr>
+<tr>
+<td><code>resi</code></td>
+<td><code>residual(A ~ B)</code></td>
+<td>A 对 B 的截面回归残差，用于提取超额信息</td>
+</tr>
+<tr>
+<td><code>ratio_product</code></td>
+<td><code>(A / B) * (C / D)</code></td>
+<td>两组相对信号的乘积</td>
+</tr>
+</tbody>
+</table>
+<p>算子包括：</p>
+<table>
+<thead>
+<tr>
+<th>变换</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>current</code></td>
+<td>当前值</td>
+</tr>
+<tr>
+<td><code>log</code></td>
+<td>对数变换</td>
+</tr>
+<tr>
+<td><code>zscore</code></td>
+<td>截面标准化</td>
+</tr>
+<tr>
+<td><code>diff_2q</code> / <code>diff_1y</code></td>
+<td>环比/同比变化</td>
+</tr>
+<tr>
+<td><code>pct_2q</code> / <code>pct_1y</code></td>
+<td>环比/同比增长率</td>
+</tr>
+<tr>
+<td><code>std_2q</code> / <code>std_1y</code></td>
+<td>过去窗口波动</td>
+</tr>
+</tbody>
+</table>
+<p>所有表达式最后统一做<code>市值中性化</code></p>
+<h3 id="12-训练目标">1.2 训练目标 </h3>
+<p>遗传算法训练阶段使用 NSGA-II 多目标选择，核心目标为：</p>
+<table>
+<thead>
+<tr>
+<th>目标</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>abs_rank_ic</code></td>
+<td>因子与未来 20D 收益的绝对 RankIC</td>
+</tr>
+<tr>
+<td><code>ic_win_rate</code></td>
+<td>日度 RankIC 与方向一致的比例</td>
+</tr>
+<tr>
+<td><code>ndcg_at_k</code></td>
+<td>因子对头部收益股票的排序质量</td>
+</tr>
+</tbody>
+</table>
+<p>本项目的重点是基本面因子，因此使用 <strong>20D 未来收益</strong> 作为主 label，避免 1D 噪声过大，也与华泰遗传规划选股因子研究中使用未来 20 个交易日收益作为优化目标的思路一致。</p>
+<h3 id="13-训练集与回测集切分">1.3 训练集与回测集切分 </h3>
+<p>训练集：</p>
+<pre data-role="codeBlock" data-info="text" class="language-text text"><code>2016-01-01 &lt;= date &lt; 2020-12-31
+</code></pre><p>验证回测期：</p>
+<pre data-role="codeBlock" data-info="text" class="language-text text"><code>2021-01-01 &lt;= date &lt; 2024-01-01
+</code></pre><p>label 定义：未来20D的收益率</p>
+<pre data-role="codeBlock" data-info="python" class="language-python python"><code>label_20d <span class="token operator">=</span> close<span class="token punctuation">.</span>shift<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">21</span><span class="token punctuation">)</span> <span class="token operator">/</span> close<span class="token punctuation">.</span>shift<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token number">1</span>
+</code></pre><h2 id="3-遗传算法搜索结果概览">3. 遗传算法搜索结果概览 </h2>
+<h3 id="31-不同表达式模式的表现">3.1 不同表达式模式的表现 </h3>
+<p><img src="image.png" alt="alt text"></p>
+<p>从 gene mode 的箱线图看：</p>
+<ul>
+<li><code>single</code>、<code>resi</code>、<code>ratio</code> 的 <code>valid_abs_rank_ic</code> 中位数更高，稳定性也更好。</li>
+<li><code>pair_ratio</code> 和 <code>ratio_product</code> 的表达式更复杂，但验证集表现不一定更强，说明过度复杂结构可能带来过拟合。</li>
+<li><code>pair_ratio</code>: 一些算子把不相关的财务指标放在同一个加减结构里，量纲错配，解释性以及效果较差。</li>
+</ul>
+<p>后续搜索可以适当提高 <code>single</code>、<code>resi</code>、<code>ratio</code> 的采样权重，降低过复杂表达式在最终候选中的比例。删除该<code>pair_ratio</code></p>
+<h2 id="4-入选因子解释">4. 入选因子解释 </h2>
+<table>
+<thead>
+<tr>
+<th>因子表达式</th>
+<th>经济解释</th>
+<th style="text-align:right">ric_1d</th>
+<th style="text-align:right">ric_5d</th>
+<th style="text-align:right">ric_20d</th>
+<th style="text-align:right">rir_20d</th>
+<th style="text-align:right">longshort_sharpe</th>
+<th style="text-align:right">pnl_longshort_ann</th>
+<th style="text-align:right">pnl_longshort_max_drawdown</th>
+<th>综合评价&amp;使用建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>市值中性化(market_cap / gross_profit)</code></td>
+<td>单位毛利对应市值越高，代表估值越贵</td>
+<td style="text-align:right">-0.028</td>
+<td style="text-align:right">-0.055</td>
+<td style="text-align:right">-0.091</td>
+<td style="text-align:right">-0.914</td>
+<td style="text-align:right">-5.830</td>
+<td style="text-align:right">-0.697</td>
+<td style="text-align:right">-0.076</td>
+<td>全指标为负，方向反向使用，整体表现差</td>
+</tr>
+<tr>
+<td><code>市值中性化(zscore(r_n_d) / book_to_market_ratio_lf)</code></td>
+<td>研发投入相对账面市值比，刻画成长投入与估值折价的结合</td>
+<td style="text-align:right">0.027</td>
+<td style="text-align:right">0.056</td>
+<td style="text-align:right">0.100</td>
+<td style="text-align:right">0.811</td>
+<td style="text-align:right">7.634</td>
+<td style="text-align:right">1.130</td>
+<td style="text-align:right">-0.064</td>
+<td>强正向，IC与夏普稳定，可作成长质量核心因子</td>
+</tr>
+<tr>
+<td><code>市值中性化(zscore(gross_profit) 对 working_capital_lf 截面回归取残差)</code></td>
+<td>剔除营运资本解释后的毛利超额水平</td>
+<td style="text-align:right">0.028</td>
+<td style="text-align:right">0.057</td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">0.103</span></td>
+<td style="text-align:right">0.722</td>
+<td style="text-align:right">9.199</td>
+<td style="text-align:right">1.310</td>
+<td style="text-align:right">-0.045</td>
+<td>IC、夏普、收益拔尖，回撤控制优秀，综合最优核心候选</td>
+</tr>
+<tr>
+<td><code>市值中性化(zscore(net_profit_deduct_non_recurring_pnl) / sp_ratio_lyr)</code></td>
+<td>扣非净利润相对销售估值，强调主营盈利能力</td>
+<td style="text-align:right">0.029</td>
+<td style="text-align:right">0.059</td>
+<td style="text-align:right">0.102</td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">0.873</span></td>
+<td style="text-align:right">9.101</td>
+<td style="text-align:right">1.100</td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">-0.034</span></td>
+<td>IC稳定性强、全场回撤最低，收益夏普顶尖，重点纳入核心组合</td>
+</tr>
+<tr>
+<td><code>市值中性化(zscore(gross_profit) / sp_ratio_ttm)</code></td>
+<td>毛利能力相对 PS 估值</td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">0.030</span></td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">0.060</span></td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">0.103</span></td>
+<td style="text-align:right">0.865</td>
+<td style="text-align:right">7.639</td>
+<td style="text-align:right">1.049</td>
+<td style="text-align:right">-0.053</td>
+<td>IC顶级，盈利估值逻辑扎实信号稳定，核心稳健因子</td>
+</tr>
+<tr>
+<td><code>市值中性化(super_quick_ratio_lyr / ps_ratio_ttm)</code></td>
+<td>超速动比率相对 PS，偏防御和偿债能力</td>
+<td style="text-align:right">0.018</td>
+<td style="text-align:right">0.030</td>
+<td style="text-align:right">0.040</td>
+<td style="text-align:right">0.567</td>
+<td style="text-align:right">6.624</td>
+<td style="text-align:right">0.722</td>
+<td style="text-align:right">-0.038</td>
+<td>IC偏弱，收益夏普尚可，仅作辅助防御类配置</td>
+</tr>
+<tr>
+<td><code>市值中性化(zscore(ebit_ttm) / sp_ratio_ttm)</code></td>
+<td>经营利润相对销售估值</td>
+<td style="text-align:right">0.029</td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">0.060</span></td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">0.103</span></td>
+<td style="text-align:right">0.850</td>
+<td style="text-align:right">6.744</td>
+<td style="text-align:right">0.931</td>
+<td style="text-align:right">-0.063</td>
+<td>正向有效，但弱于2/3/4，作为次选盈利估值因子</td>
+</tr>
+<tr>
+<td><code>市值中性化(profit_before_tax 对 zscore(working_capital_lyr) 截面回归取残差)</code></td>
+<td>剔除营运资本后的税前利润超额水平</td>
+<td style="text-align:right">0.026</td>
+<td style="text-align:right">0.053</td>
+<td style="text-align:right">0.093</td>
+<td style="text-align:right">0.672</td>
+<td style="text-align:right">6.952</td>
+<td style="text-align:right">1.010</td>
+<td style="text-align:right">-0.080</td>
+<td>整体表现中上，回撤偏高，轻度纳入并控制权重</td>
+</tr>
+<tr>
+<td><code>市值中性化(net_profit_deduct_non_recurring_pnl 对 working_capital_lyr 截面回归取残差)</code></td>
+<td>剔除营运资本后的扣非利润质量</td>
+<td style="text-align:right">0.025</td>
+<td style="text-align:right">0.052</td>
+<td style="text-align:right">0.091</td>
+<td style="text-align:right">0.708</td>
+<td style="text-align:right">7.183</td>
+<td style="text-align:right">1.017</td>
+<td style="text-align:right">-0.054</td>
+<td>各指标稳定中上，适合作为盈利质量补充因子</td>
+</tr>
+<tr>
+<td><code>市值中性化(zscore(total_equity) / account_receivable_turnover_rate_ttm)</code></td>
+<td>净资产规模相对收款周转，反映资产质量和经营效率</td>
+<td style="text-align:right">0.028</td>
+<td style="text-align:right">0.057</td>
+<td style="text-align:right">0.100</td>
+<td style="text-align:right">0.735</td>
+<td style="text-align:right">6.588</td>
+<td style="text-align:right">1.056</td>
+<td style="text-align:right">-0.080</td>
+<td>正向有效，易与规模类因子重叠，需冗余剔除后使用</td>
+</tr>
+<tr>
+<td><code>市值中性化(deferred_revenue 对 zscore(cash_paid_for_debt) 截面回归取残差)</code></td>
+<td>剔除偿债现金流后的递延收入超额，代表订单/预收质量</td>
+<td style="text-align:right">0.021</td>
+<td style="text-align:right">0.046</td>
+<td style="text-align:right">0.091</td>
+<td style="text-align:right">0.724</td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">9.500</span></td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">1.305</span></td>
+<td style="text-align:right">-0.049</td>
+<td>多空夏普、多头收益夏普全场顶尖，回撤优异，多空&amp;多头最优候选</td>
+</tr>
+<tr>
+<td><code>市值中性化(working_capital_ttm 对 goodwill 截面回归取残差)</code></td>
+<td>剔除商誉影响后的营运资本质量</td>
+<td style="text-align:right">0.027</td>
+<td style="text-align:right">0.053</td>
+<td style="text-align:right">0.092</td>
+<td style="text-align:right">0.781</td>
+<td style="text-align:right">7.109</td>
+<td style="text-align:right">1.066</td>
+<td style="text-align:right">-0.096</td>
+<td>逻辑有效但全场回撤最高，需严格降低配置权重</td>
+</tr>
+<tr>
+<td><code>市值中性化(zscore(market_cap_3) 对 cash_ratio_ttm 截面回归取残差)</code></td>
+<td>剔除现金比率后的规模残差信号</td>
+<td style="text-align:right">0.019</td>
+<td style="text-align:right">0.044</td>
+<td style="text-align:right">0.085</td>
+<td style="text-align:right">0.718</td>
+<td style="text-align:right">7.882</td>
+<td style="text-align:right">1.012</td>
+<td style="text-align:right"><span style="color:red;font-weight:bold">-0.042</span></td>
+<td>回撤极低表现稳健，偏规模风格，适配低波动组合</td>
+</tr>
+<tr>
+<td><code>市值中性化(zscore(market_cap_3) 对 return_on_invested_capital_ttm 截面回归取残差)</code></td>
+<td>剔除 ROIC 后的规模残差信号</td>
+<td style="text-align:right">0.019</td>
+<td style="text-align:right">0.044</td>
+<td style="text-align:right">0.085</td>
+<td style="text-align:right">0.717</td>
+<td style="text-align:right">8.076</td>
+<td style="text-align:right">1.0</td>
+<td style="text-align:right">-0.042</td>
+<td>指标与12高度相近，风格冗余，二选一保留并做去共线性</td>
+</tr>
+</tbody>
+</table>
+<h3 id="51-因子回测图像">5.1 因子回测图像 </h3>
+<h3 id="1-residualdeferred_revenue--zscorecash_paid_for_debt">1. <code>residual(deferred_revenue ~ zscore(cash_paid_for_debt))</code>: </h3>
+<p>该因子将递延收入对偿债现金流做回归并取残差，剥离了依靠“借新还旧”维持运转的重资产或伪成长企业。能偶提纯出纯靠硬核产品力让客户提前充值掏钱的优质SaaS或游戏龙头，是TMT核心商业模式的很好体现。</p>
+<p><img src="image-1.png" alt="alt text"></p>
+<h3 id="2--residualzscoregross_profit--working_capital_lf">2.  <code>residual(zscore(gross_profit) ~ working_capital_lf)</code> </h3>
+<p>将截面标准化的毛利对营运资本取残差，旨在寻找用极少的资金占用撬动了极高毛利的企业。它高度契合TMT的轻资产属性，直接反映了企业在产业链中极强的议价权（如先款后货）与健康的现金流运转效率。<br>
+<img src="image-2.png" alt="alt text"></p>
+<h3 id="3--zscorer_n_d--book_to_market_ratio_lf">3.  <code>zscore(r_n_d) / book_to_market_ratio_lf</code> </h3>
+<p>等价于“标准化研发投入乘以市净率（PB）”，将技术投入壁垒与市场估值溢价结合在了一起。它能有效捕获研发势能强劲且已被资金面认可的科技白马，属于“高质量成长与动能”复合因子。<br>
+<img src="image-3.png" alt="alt text"></p>
+<h3 id="4--zscorenet_profit_deduct_non_recurring_pnl--sp_ratio_lyr">4.  <code>zscore(net_profit_deduct_non_recurring_pnl) / sp_ratio_lyr</code> </h3>
+<p>因子将扣非净利润与市销率（PS）进行动态平衡，完美适应了TMT早期企业利润波动大而常以PS估值的体系。它能够极其稳健地筛选出主业利润丰厚，但相对于其庞大营收规模而言估值尚未泡沫化的中坚力量。<br>
+<img src="image-4.png" alt="alt text"></p>
+<h3 id="5--residualworking_capital_ttm--goodwill">5.  <code>residual(working_capital_ttm ~ goodwill)</code> </h3>
+<p>由于TMT行业（尤其是传媒与IT服务）常年存在大量外延式并购，财务并表极易导致营运资本虚高。该因子通过剔除商誉影响后的营运资本，能有效挤出并购带来的虚假繁荣水分，锁定内生造血能力极强的真实龙头企业。<br>
+<img src="image-5.png" alt="alt text"></p>
+
+      </div>
+      
+      
+    
+    
+    
+    
+    
+    
+  
+    </body></html>
