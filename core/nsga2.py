@@ -12,9 +12,9 @@ import pandas as pd
 #
 # The report uses NSGA-II because the three objectives are not combined into a
 # single weighted score. This keeps different kinds of good factors alive:
-#   - high |IC| factors,
-#   - high IC-win-rate factors,
-#   - high NDCG@k factors.
+#   - high raw RankICIR factors,
+#   - high raw NDCG@k factors,
+#   - factors whose RankICIR survives dynamic Barra style stripping.
 #
 # All objectives in this reproduction are maximized.
 # ---------------------------------------------------------------------------

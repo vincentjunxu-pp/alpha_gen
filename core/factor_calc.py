@@ -5,7 +5,7 @@ import pandas as pd
 
 from .gene import TRANSFORM_WINDOWS, FactorGene, validate_gene
 from .preprocess import TransformCache
-from .utils import cs_resi, cs_zscore, dot_add, dot_div, dot_sub, validate_pivot_format
+from .utils import cs_rank, cs_resi, cs_zscore, dot_add, dot_div, dot_log, dot_sub, validate_pivot_format
 
 
 # ---------------------------------------------------------------------------
@@ -19,10 +19,14 @@ from .utils import cs_resi, cs_zscore, dot_add, dot_div, dot_sub, validate_pivot
 #   ratio:      A / B
 #   pair_ratio: (A +/- B) / (C +/- D)
 #   resi:       residual(A ~ B)
-#   ratio_product: (A / B) * (C / D)
+#   resi_pair:  residual(A ~ B + C)
+#   multi_resi: residual(A ~ B + C + D)
+#   spread:     A / B - C / D
+#   style_composite: combine(rank_score(A), rank_score(B))
 #
-# Ne means size neutralization. Raw market cap is log-transformed for the size
-# control so extreme large caps do not dominate the cross-sectional regression.
+# Ne means size neutralization. The default control is Barra size exposure.
+# Raw market_cap remains a backward-compatible fallback and is signed-log
+# transformed only when that legacy field is explicitly selected.
 # ---------------------------------------------------------------------------
 
 
@@ -63,15 +67,146 @@ def _cross_sectional_residual(y: pd.DataFrame, x: pd.DataFrame) -> pd.DataFrame:
     return _clean_factor(residual)
 
 
+def _solve_small_linear_system(matrix: np.ndarray, vector: np.ndarray, eps: float = 1e-8) -> np.ndarray | None:
+    """Solve a small dense linear system without calling platform LAPACK."""
+
+    a = matrix.astype("float64", copy=True)
+    b = vector.astype("float64", copy=True)
+    n = len(b)
+    for i in range(n):
+        a[i, i] += eps
+
+    for col in range(n):
+        pivot = col + int(np.argmax(np.abs(a[col:, col])))
+        pivot_value = float(a[pivot, col])
+        if not np.isfinite(pivot_value) or abs(pivot_value) <= eps:
+            return None
+        if pivot != col:
+            a[[col, pivot]] = a[[pivot, col]]
+            b[[col, pivot]] = b[[pivot, col]]
+
+        for row in range(col + 1, n):
+            factor = a[row, col] / a[col, col]
+            a[row, col:] -= factor * a[col, col:]
+            b[row] -= factor * b[col]
+
+    solution = np.zeros(n, dtype="float64")
+    for row in range(n - 1, -1, -1):
+        denom = float(a[row, row])
+        if not np.isfinite(denom) or abs(denom) <= eps:
+            return None
+        trailing = 0.0
+        for col in range(row + 1, n):
+            trailing += float(a[row, col]) * float(solution[col])
+        solution[row] = (b[row] - trailing) / denom
+    return solution
+
+
+def _normal_equations(design: np.ndarray, y_values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Build X'X and X'y with scalar loops for small cross-sectional regressions."""
+
+    n_obs, n_cols = design.shape
+    xtx = np.zeros((n_cols, n_cols), dtype="float64")
+    xty = np.zeros(n_cols, dtype="float64")
+    for obs in range(n_obs):
+        y_value = float(y_values[obs])
+        for i in range(n_cols):
+            xi = float(design[obs, i])
+            xty[i] += xi * y_value
+            for j in range(n_cols):
+                xtx[i, j] += xi * float(design[obs, j])
+    return xtx, xty
+
+
+def _cross_sectional_multi_residual(y: pd.DataFrame, controls: list[pd.DataFrame]) -> pd.DataFrame:
+    """Residual of y regressed on multiple controls for each date."""
+
+    common_index = y.index
+    common_columns = y.columns
+    for control in controls:
+        common_index = common_index.intersection(control.index)
+        common_columns = common_columns.intersection(control.columns)
+    y_aligned = y.reindex(index=common_index, columns=common_columns)
+    controls_aligned = [control.reindex(index=common_index, columns=common_columns) for control in controls]
+
+    result = pd.DataFrame(index=common_index, columns=common_columns, dtype="float64")
+    min_obs = len(controls) + 2
+    for dt in common_index:
+        row_data = {"y": y_aligned.loc[dt]}
+        for idx, control in enumerate(controls_aligned):
+            row_data[f"x{idx}"] = control.loc[dt]
+        tmp = pd.DataFrame(row_data).replace([np.inf, -np.inf], np.nan).dropna()
+        if len(tmp) < min_obs:
+            continue
+
+        y_values = tmp["y"].to_numpy(dtype="float64")
+        x_values = tmp[[f"x{idx}" for idx in range(len(controls))]].to_numpy(dtype="float64")
+        design = np.column_stack([np.ones(len(tmp), dtype="float64"), x_values])
+        xtx, xty = _normal_equations(design, y_values)
+        beta = _solve_small_linear_system(xtx, xty)
+        if beta is None:
+            continue
+        fitted = np.zeros(len(tmp), dtype="float64")
+        for obs in range(len(tmp)):
+            value = 0.0
+            for col in range(len(beta)):
+                value += float(design[obs, col]) * float(beta[col])
+            fitted[obs] = value
+        result.loc[dt, tmp.index] = y_values - fitted
+
+    return _clean_factor(result.reindex(index=y.index, columns=y.columns))
+
+
+def _industry_relative(
+    raw: pd.DataFrame,
+    industry: pd.DataFrame | None,
+    tradeable: pd.DataFrame,
+    *,
+    method: str,
+) -> pd.DataFrame:
+    """Cross-sectional transform within each date's industry groups."""
+
+    if industry is None:
+        raise ValueError(f"{method} transform requires cache.industry")
+
+    values = apply_tradeable_mask(raw, tradeable)
+    values, industry = values.align(industry, join="inner", axis=0)
+    values, industry = values.align(industry, join="inner", axis=1)
+    result = pd.DataFrame(index=values.index, columns=values.columns, dtype="float64")
+
+    for dt in values.index:
+        tmp = pd.DataFrame({"value": values.loc[dt], "industry": industry.loc[dt]})
+        tmp = tmp.replace([np.inf, -np.inf], np.nan).dropna()
+        if tmp.empty:
+            continue
+        for _industry_name, group in tmp.groupby("industry", observed=True):
+            group_values = group["value"]
+            if method == "ind_rank_pct":
+                result.loc[dt, group.index] = group_values.rank(method="average", pct=True)
+            elif method == "ind_zscore":
+                if len(group_values) < 2:
+                    continue
+                std = group_values.std()
+                if not np.isfinite(std) or std <= 0:
+                    continue
+                result.loc[dt, group.index] = (group_values - group_values.mean()) / (std + 1e-8)
+            else:
+                raise ValueError(f"unknown industry relative transform: {method!r}")
+
+    return _clean_factor(result)
+
+
 def _apply_transform(raw: pd.DataFrame, transform: str) -> pd.DataFrame:
     """Apply one same-contract historical transform without future data."""
 
     if transform == "current":
         return _clean_factor(raw)
     if transform == "log":
-        return _clean_factor(np.log(raw.where(raw > 0)))
+        return _clean_factor(dot_log(raw))
     if transform == "zscore":
         return _clean_factor(cs_zscore(raw))
+    if transform == "rank_pct":
+        return _clean_factor(cs_rank(raw, pct=True))
 
     if transform.endswith("_2q"):
         window = TRANSFORM_WINDOWS["2q"]
@@ -84,8 +219,6 @@ def _apply_transform(raw: pd.DataFrame, transform: str) -> pd.DataFrame:
         return _clean_factor(raw.diff(periods=window))
     if transform.startswith("pct_"):
         return _clean_factor(raw.pct_change(periods=window, fill_method=None))
-    if transform.startswith("std_"):
-        return _clean_factor(raw.rolling(window=window, min_periods=window).std())
     raise ValueError(f"unknown transform: {transform!r}")
 
 
@@ -96,6 +229,11 @@ def _feature(field: str, transform: str, cache: TransformCache) -> pd.DataFrame:
     if transform == "zscore":
         masked = apply_tradeable_mask(raw, cache.tradeable)
         return _clean_factor(cs_zscore(masked))
+    if transform == "rank_pct":
+        masked = apply_tradeable_mask(raw, cache.tradeable)
+        return _clean_factor(cs_rank(masked, pct=True))
+    if transform in {"ind_rank_pct", "ind_zscore"}:
+        return _industry_relative(raw, cache.industry, cache.tradeable, method=transform)
     transformed = _apply_transform(raw, transform)
     return apply_tradeable_mask(transformed, cache.tradeable)
 
@@ -121,10 +259,45 @@ def apply_tradeable_mask(factor: pd.DataFrame, tradeable: pd.DataFrame) -> pd.Da
     return _clean_factor(factor.where(mask))
 
 
-def _log_size_control(size: pd.DataFrame) -> pd.DataFrame:
-    """Use log market cap as the size control for neutralization."""
+def industry_neutralize(
+    factor: pd.DataFrame,
+    cache: TransformCache,
+    *,
+    tradeable_only: bool = True,
+) -> pd.DataFrame:
+    """Remove industry dummy exposure by demeaning within each date/industry.
 
-    return _clean_factor(np.log(size.where(size > 0)))
+    This is used only when the search universe spans all or multiple
+    industries. A single-industry universe should skip this step because the
+    industry dummy would be constant and would only remove the daily intercept.
+    """
+
+    if cache.industry is None:
+        raise ValueError("industry neutralization requires an industry matrix in TransformCache")
+
+    factor = apply_tradeable_mask(factor, cache.tradeable) if tradeable_only else _clean_factor(factor)
+    factor, industry = factor.align(cache.industry, join="inner", axis=0)
+    factor, industry = factor.align(industry, join="inner", axis=1)
+
+    neutralized = pd.DataFrame(index=factor.index, columns=factor.columns, dtype="float64")
+    for dt in factor.index:
+        tmp = pd.DataFrame({"factor": factor.loc[dt], "industry": industry.loc[dt]})
+        tmp = tmp.replace([np.inf, -np.inf], np.nan).dropna()
+        if tmp.empty:
+            continue
+        group_mean = tmp.groupby("industry", observed=True)["factor"].transform("mean")
+        neutralized.loc[dt, tmp.index] = tmp["factor"] - group_mean
+
+    neutralized = neutralized.reindex(index=factor.index, columns=factor.columns)
+    neutralized = apply_tradeable_mask(neutralized, cache.tradeable) if tradeable_only else neutralized
+    validate_pivot_format(neutralized, require_time_component=True, strict=True)
+    return _clean_factor(neutralized)
+
+
+def _log_size_control(size: pd.DataFrame) -> pd.DataFrame:
+    """Use signed log1p Barra size as the size control for neutralization."""
+
+    return _clean_factor(dot_log(size))
 
 
 def calculate_raw_factor(gene: FactorGene, cache: TransformCache) -> pd.DataFrame:
@@ -148,10 +321,21 @@ def calculate_raw_factor(gene: FactorGene, cache: TransformCache) -> pd.DataFram
         return _safe_divide(a, b)
     if gene.mode == "resi":
         return _cross_sectional_residual(a, b)
-    if gene.mode == "ratio_product":
+    if gene.mode == "resi_pair":
+        c = _feature(gene.c, gene.c_transform, cache)
+        return _cross_sectional_residual(a, _combine(b, c, "+"))
+    if gene.mode == "multi_resi":
         c = _feature(gene.c, gene.c_transform, cache)
         d = _feature(gene.d, gene.d_transform, cache)
-        return _clean_factor(_safe_divide(a, b).mul(_safe_divide(c, d)))
+        return _cross_sectional_residual(a, _combine(_combine(b, c, "+"), d, "+"))
+    if gene.mode == "spread":
+        c = _feature(gene.c, gene.c_transform, cache)
+        d = _feature(gene.d, gene.d_transform, cache)
+        return _clean_factor(_safe_divide(a, b) - _safe_divide(c, d))
+    if gene.mode == "style_composite":
+        a_style = (_feature(gene.a, "rank_pct", cache) - 0.5) * cache.field_rules[gene.a].direction
+        b_style = (_feature(gene.b, "rank_pct", cache) - 0.5) * cache.field_rules[gene.b].direction
+        return _combine(a_style, b_style, "+")
 
     left = _combine(a, b, gene.left_op)
     c = _feature(gene.c, gene.c_transform, cache)
@@ -169,17 +353,25 @@ def size_neutralize(
     factor: pd.DataFrame,
     cache: TransformCache,
     *,
-    size_field: str = "market_cap",
-    use_log_size: bool = True,
+    size_field: str = "barra_size",
+    use_log_size: bool | None = None,
     tradeable_only: bool = True,
 ) -> pd.DataFrame:
-    """Neutralize a factor against size at each date.
+    """Neutralize a factor against the configured Barra size field at each date.
 
-    The size field is raw market cap by default, so neutralization uses
-    `log(market_cap)` unless `use_log_size=False` is explicitly passed.
+    Raw market cap is log-scaled by default for backward compatibility. A
+    passed Barra size exposure is usually already standardized, so custom
+    `size_field` values are used as-is unless `use_log_size=True` is explicit.
     """
 
+    if (size_field, False) not in cache.current:
+        raise KeyError(
+            f"size neutralization field {size_field!r} is not cached; "
+            "include the Barra size field in metadata/field_rules or cache.current"
+        )
     size = cache.get_current(size_field, use_log=False)
+    if use_log_size is None:
+        use_log_size = size_field == "market_cap"
     if use_log_size:
         size = _log_size_control(size)
     factor = apply_tradeable_mask(factor, cache.tradeable) if tradeable_only else _clean_factor(factor)
@@ -196,11 +388,22 @@ def calculate_factor(
     cache: TransformCache,
     *,
     neutralize_size: bool = True,
+    neutralize_industry: bool = False,
+    size_field: str = "barra_size",
+    use_log_size: bool | None = None,
     tradeable_only: bool = True,
 ) -> pd.DataFrame:
     """Calculate the final structured factor matrix for one gene."""
 
-    raw_factor = calculate_raw_factor(gene, cache)
+    factor = calculate_raw_factor(gene, cache)
+    if neutralize_industry:
+        factor = industry_neutralize(factor, cache, tradeable_only=tradeable_only)
     if not neutralize_size:
-        return apply_tradeable_mask(raw_factor, cache.tradeable) if tradeable_only else raw_factor
-    return size_neutralize(raw_factor, cache, tradeable_only=tradeable_only)
+        return apply_tradeable_mask(factor, cache.tradeable) if tradeable_only else factor
+    return size_neutralize(
+        factor,
+        cache,
+        size_field=size_field,
+        use_log_size=use_log_size,
+        tradeable_only=tradeable_only,
+    )

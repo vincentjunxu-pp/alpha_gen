@@ -11,16 +11,21 @@ single      A
 ratio       A / B
 pair_ratio  (A +/- B) / (C +/- D)
 resi        residual(A ~ B)
-ratio_product (A / B) * (C / D)
+resi_pair   residual(A ~ B + C)
+multi_resi  residual(A ~ B + C + D)
+spread      A / B - C / D
+style_composite rank_score(A) + rank_score(B)
 ```
 
-其中 A/B/C/D 都是 `字段 + unary transform`，当前支持 `current`、`log`、`zscore`、`diff_2q`、`diff_1y`、`pct_2q`、`pct_1y`、`std_2q`、`std_1y`。所有表达式最后统一做市值中性化。市值字段默认使用 `market_cap`，mock 数据中已经是 log size。
+其中 A/B/C/D 都是 `字段 + unary transform`，当前支持 `current`、`log`、`rank_pct`、`zscore`、`ind_rank_pct`、`ind_zscore`、`diff_2q`、`diff_1y`、`pct_2q`、`pct_1y`。rolling 类 `std_2q/std_1y` 已退出自由搜索池。`ind_*` 算子依赖 `TransformCache.industry`。表达式合法性现在不仅看 y/x 角色，还会检查 metadata 中的 `family`、`unit_type`、`add_group`、`direction` 等语义标签。所有表达式最后统一做中性化：当 `industry_scope` 表示全行业或多行业时先按 `industry_code` 做行业中性化，再对 `size_field` 指定的 Barra size 做截面残差中性化。`size_field` 默认为 `market_cap` 以兼容 mock 数据，正式 Barra size 字段可通过配置传入。
 
-训练阶段的 NSGA-II 目标仍是：
+训练阶段的 NSGA-II 目标是：
 
 ```text
-|RankIC|, IC win rate, NDCG@k
+raw RankICIR, raw NDCG@k, dynamic-Barra-neutralized RankICIR
 ```
+
+`abs_rank_ic` 和 `ic_win_rate` 仍会导出用于观察和验证过滤，但不再作为 NSGA-II 的独立优化目标。Torch 路径可以传入 10 个已截面标准化的 Barra style 字段；评估时会自动选择平均绝对相关超过 0.3 的 top 2 风格做截面残差化，并把残差因子的 RankICIR 作为第三目标。
 
 验证阶段额外计算分组 PnL 指标，并展开到最终结果表。
 
@@ -78,7 +83,9 @@ columns = 因子字段 + label + tradeable + 可选行业字段
 ```text
 label       默认列名 label_20d；如果你的列名是 label，需要 build_transform_cache(..., label_col="label")
 tradeable   默认列名 is_tradeable；如果你的列名是 tradeable，需要 build_transform_cache(..., tradeable_col="tradeable")
-market_cap  默认市值中性化字段；mock 数据里已经是 log size
+market_cap  兼容默认 size_field；正式运行推荐传入 Barra size 字段
+industry_code 行业中性化字段；当 industry_scope 为 all/多行业时使用
+Barra style fields 可选；传给 TorchEvalContext/GAConfig.barra_style_fields，要求已截面 z-score 且 NaN 填 0.0
 ```
 
 注意：
@@ -86,7 +93,8 @@ market_cap  默认市值中性化字段；mock 数据里已经是 log size
 - `Datetime` 需要是 `pandas.DatetimeIndex`，推荐带 `15:00:00`。
 - 数据已经提供 label 字段时，回测/验证收益直接使用该 label 矩阵，不再从 close/trade_price 重新 shift 生成收益。
 - 不允许用未来数据回填历史，只允许按可得时间前向填充。
-- `log`、`zscore`、2Q/1Y 的 `diff`、`pct`、`std` 已作为 gene 算子参数，不需要预先生成 `log_*` 字段。
+- `log`、`rank_pct`、`zscore`、`ind_rank_pct`、`ind_zscore`、2Q/1Y 的 `diff`、`pct` 已作为 gene 算子参数，不需要预先生成 `log_*` 字段。`log` 统一使用 `sign(x) * log(1 + abs(x))`，不会因负数直接置空。rolling `std_2q/std_1y` 暂不进入自由 unary transform 池。
+- `build_transform_cache(..., extra_current_fields=[size_field, *barra_style_fields])` 可缓存不进入搜索池的 Barra size 和 Barra style 控制字段。若 `size_field` 或传入的 style 字段不在缓存中，训练/验证会明确报错。
 - 其他已在外部计算完成的衍生字段仍可作为普通字段进入 GA。
 - 当前代码不依赖运行时导入 `alpha_factory`；但指标口径尽量对齐 `E:\实习\alpha_factory\factor\evaluation`。
 - mock 数据中 `market_cap` 已经是 log size，`mock_tmt_metadata.json` 中 `market_cap.allow_log=false`。
@@ -108,7 +116,7 @@ load_field_rules(metadata)
 GPU 入口会额外创建：
 
 ```text
-TorchEvalContext(cache)
+TorchEvalContext(cache, barra_style_fields=("size", "beta", ...))
 ```
 
 ### 训练和验证触发时机
@@ -117,8 +125,9 @@ TorchEvalContext(cache)
 
 - 每一代 parent/offspring 都只在 `train_dates` 上评估。
 - 评估结果进入 `history`。
-- NSGA-II selection 只使用训练目标。
+- NSGA-II selection 只使用训练目标：`rank_ic_ir`、`ndcg_at_k`、`neutralized_icir`。
 - 每一轮子代不会自动触发验证集评估。
+- `GAConfig.mode_probabilities` 控制 mode 生成概率；默认 `None` 表示对当前 `MODE_CHOICES` 等权采样。传入字典时只影响随机初始化、补齐种群和 mode 变异，不改变 NSGA-II 选择口径。
 
 `validate_population()` 才会触发验证集评估：
 
@@ -139,24 +148,46 @@ a, b, c, d, left_op, right_op, mode, a_transform, b_transform, c_transform, d_tr
 各模式使用字段：
 
 ```text
-single      a
-ratio       a, b
-pair_ratio  a, b, c, d, left_op, right_op
-resi        a, b
-ratio_product a, b, c, d
+single          a
+ratio           a, b
+pair_ratio      a, b, c, d, left_op, right_op
+resi            a, b
+resi_pair       a, b, c
+multi_resi      a, b, c, d
+spread          a, b, c, d
+style_composite a, b, left_op
 ```
+
+当前 mode 语义约束：
+
+- `single` 只允许 ratio/rate/growth/score/turnover/yield 等本身已经无量纲或可直接解释的指标。
+- `ratio` 要求 A/B 的 `unit_type` 和 `add_group` 模板同时命中白名单，且只能使用保持会计量纲的 transform。
+- `pair_ratio` 要求 A/B 同 `unit_type`、同 `add_group`、同 transform，C/D 同理，最后分子/分母的 `unit_type` 也必须命中比值白名单。
+- `resi` 的 A/B 都只要求是 metadata 中存在且 transform 合法的任意字段，不再限制 A 的 signal family / `can_y=true`，也不再限制 B 的 control family / `can_x=true`。
+- `resi_pair` 为 `residual(A ~ B + C)`，A 不限制角色；B/C 必须是可解释的同组可加控制项：同 `unit_type`、同 `add_group`、同 accounting transform，不能和目标项重复。
+- `multi_resi` 为 `residual(A ~ B + C + D)`，A 不限制角色；B/C/D 必须是同 `unit_type`、同 `add_group`、同 accounting transform 的可加控制项，不能随机抽三个不相关字段相加。
+- `spread` 为两个合法会计比值之差：`A / B - C / D`，左右两侧分别复用 `ratio` 的 unit/add_group/transform 约束。
+- `style_composite` 在内部计算 `direction * (rank_pct - 0.5)` 后相加，只允许白名单风格组合，例如 quality/value、growth/value、analyst/value；当前不允许减法。
 
 表达式计算统一流程：
 
 ```text
 取当前字段矩阵
-  -> 按 gene 参数做 log/diff/pct/std 等字段级变换
+  -> 按 gene 参数做 log/rank/zscore/行业内 rank 或 zscore/diff/pct 等字段级变换
   -> tradeable mask
   -> 按 mode 组合
-  -> 对 market_cap 做截面残差中性化
+  -> 如果 industry_scope 是全行业或多行业，先按 industry_code 去行业均值
+  -> 对 size_field 指定的 Barra size 做截面残差中性化
 ```
 
 Pandas 版本在 `factor_calc.py`，Torch 版本在 `torch_backend.py`。正式运行优先使用 Torch 路径。
+
+中性化配置：
+
+- `GAConfig.industry_scope=None` 或传入具体单行业名时，不做行业中性化。
+- `GAConfig.industry_scope="all"`、`"multi"`、`"全行业"`、`"多行业"`，或传入多个行业名时，强制做行业中性化。
+- `GAConfig.size_field` 控制市值/规模中性化字段。若是 `market_cap`，默认使用 signed log1p 后回归；若是传入的 Barra size 字段，默认直接使用原始 Barra exposure，不再 log。需要覆盖时可显式设置 `use_log_size`。
+- `GAConfig.barra_style_fields` 控制动态 Barra 剥离用的风格字段。字段应在外部完成截面 z-score 和 NaN->0；本地只做张量化相关性筛选和残差化。`barra_corr_threshold` 默认 0.30，`barra_max_styles` 默认 2。
 
 ## 6. 指标和边界口径
 
@@ -191,7 +222,23 @@ coverage_mean = coverage.dropna().mean()
 
 ### NDCG
 
-NDCG 仍是 `alpha_gen` 本地目标之一，用于 GA 多目标训练。CPU/GPU 口径需要继续保持一致，后续修改要同步检查。
+NDCG 是第二个 NSGA-II 目标，用于保留头部多头表现好的因子。CPU/GPU 口径需要继续保持一致，后续修改要同步检查。
+
+### 动态 Barra 风格剥离
+
+动态 Barra 剥离只在 Torch 评估路径中生效：
+
+```text
+raw factor
+  -> 因子截面 z-score，NaN 填 0
+  -> 与 K 个 Barra style 张量点乘，得到每期 Pearson corr
+  -> abs(mean(corr_t)) > 0.3 的风格进入候选
+  -> 取相关性最大的至多 2 个风格
+  -> 每天截面批量 OLS：raw factor ~ intercept + selected Barra styles
+  -> residual factor 的 RankICIR 作为 neutralized_icir
+```
+
+方向统一由原因子的 `direction` 决定：如果残差因子的自然 IC 方向与原因子相反，也不会重新翻方向，而是使用原因子的方向计算 `neutralized_icir`。CPU 评估路径没有 Barra 张量上下文，因此 `neutralized_icir` 默认回填为 raw `rank_ic_ir`，保持接口兼容。
 
 ### 分组 PnL / 回测指标
 

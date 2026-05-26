@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -81,6 +81,13 @@ class GAConfig:
     ndcg_k: int | None = None
     ndcg_top_fraction: float = 0.10
     min_coverage: float = 0.30
+    mode_probabilities: dict[str, float] | None = None
+    size_field: str = "barra_size"
+    use_log_size: bool | None = None
+    industry_scope: str | Sequence[str] | None = None
+    barra_style_fields: Sequence[str] | str = ()
+    barra_corr_threshold: float = 0.30
+    barra_max_styles: int = 2
     use_gpu: bool = False
     device: str = "auto"
     cache_on_device: bool = True
@@ -124,6 +131,53 @@ class SearchResult:
     history: list[EvaluatedGene]
 
 
+def should_neutralize_industry(industry_scope: str | Sequence[str] | None) -> bool:
+    """Return whether a universe should be neutralized by industry.
+
+    A concrete single industry, e.g. "electronics", is treated as a
+    single-industry universe and skipped. "all", "multi", or a sequence with
+    more than one distinct industry means the factor is searched on a
+    cross-industry universe and should be industry-neutralized before size
+    neutralization.
+    """
+
+    if industry_scope is None:
+        return False
+    if isinstance(industry_scope, str):
+        text = industry_scope.strip().lower()
+        if not text or text in {"none", "single", "specific", "one"}:
+            return False
+        return text in {"all", "all_industries", "all-industry", "multi", "multiple", "全行业", "多行业"}
+
+    values = {str(value).strip() for value in industry_scope if str(value).strip()}
+    if not values:
+        return False
+    lowered = {value.lower() for value in values}
+    if lowered & {"all", "all_industries", "all-industry", "multi", "multiple", "全行业", "多行业"}:
+        return True
+    return len(values) > 1
+
+
+def normalize_barra_style_fields(fields: Sequence[str] | str | None) -> tuple[str, ...]:
+    """Normalize user-provided Barra style field names for Torch evaluation."""
+
+    if fields is None:
+        return ()
+    if isinstance(fields, str):
+        values = [fields]
+    else:
+        values = list(fields)
+    return tuple(
+        dict.fromkeys(
+            text
+            for field in values
+            if field is not None
+            for text in [str(field).strip()]
+            if text
+        )
+    )
+
+
 def gene_key(gene: FactorGene) -> tuple[object, ...]:
     """Stable semantic key used for de-duplicating genes.
 
@@ -140,20 +194,35 @@ def gene_key(gene: FactorGene) -> tuple[object, ...]:
         return (gene.mode, gene.a, gene.a_transform)
     if gene.mode in {"ratio", "resi"}:
         return (gene.mode, gene.a, gene.a_transform, gene.b, gene.b_transform)
+    if gene.mode == "resi_pair":
+        controls = tuple(sorted(((gene.b, gene.b_transform), (gene.c, gene.c_transform))))
+        return (gene.mode, gene.a, gene.a_transform, controls)
+    if gene.mode == "multi_resi":
+        controls = tuple(
+            sorted(
+                (
+                    (gene.b, gene.b_transform),
+                    (gene.c, gene.c_transform),
+                    (gene.d, gene.d_transform),
+                )
+            )
+        )
+        return (gene.mode, gene.a, gene.a_transform, controls)
+    if gene.mode == "spread":
+        return (
+            gene.mode,
+            (gene.a, gene.a_transform, gene.b, gene.b_transform),
+            (gene.c, gene.c_transform, gene.d, gene.d_transform),
+        )
     if gene.mode == "pair_ratio":
         return (
             gene.mode,
             pair_key((gene.a, gene.a_transform), (gene.b, gene.b_transform), gene.left_op),
             pair_key((gene.c, gene.c_transform), (gene.d, gene.d_transform), gene.right_op),
         )
-    if gene.mode == "ratio_product":
-        ratio_terms = sorted(
-            (
-                (gene.a, gene.a_transform, gene.b, gene.b_transform),
-                (gene.c, gene.c_transform, gene.d, gene.d_transform),
-            )
-        )
-        return (gene.mode, *ratio_terms)
+    if gene.mode == "style_composite":
+        terms = tuple(sorted((gene.a, gene.b))) if gene.left_op == "+" else (gene.a, gene.b)
+        return (gene.mode, gene.left_op, *terms)
     return tuple(gene.to_dict().get(field) for field in GENE_FIELDS)
 
 
@@ -169,6 +238,11 @@ def _empty_score() -> FactorScore:
         direction=1,
         n_ic_obs=0,
         coverage=0.0,
+        neutralized_icir=0.0,
+        neutralized_mean_rank_ic=0.0,
+        neutralized_abs_rank_ic=0.0,
+        neutralized_ic_win_rate=0.0,
+        neutralized_n_ic_obs=0,
     )
 
 
@@ -223,6 +297,8 @@ def crossover_genes(
     right: FactorGene,
     field_rules: Mapping[str, FieldRule],
     rng: np.random.Generator,
+    *,
+    mode_probabilities: Mapping[str, float] | None = None,
 ) -> tuple[FactorGene, FactorGene]:
     """Uniform crossover over the structured gene parameters.
 
@@ -240,9 +316,23 @@ def crossover_genes(
         if rng.random() < 0.5:
             child_a[field], child_b[field] = child_b[field], child_a[field]
 
-    repaired_a = repair_gene(FactorGene.from_dict(child_a), field_rules, rng)
-    repaired_b = repair_gene(FactorGene.from_dict(child_b), field_rules, rng)
+    repaired_a = repair_gene(FactorGene.from_dict(child_a), field_rules, rng, mode_probabilities=mode_probabilities)
+    repaired_b = repair_gene(FactorGene.from_dict(child_b), field_rules, rng, mode_probabilities=mode_probabilities)
     return repaired_a, repaired_b
+
+
+def _try_random_gene(
+    field_rules: Mapping[str, FieldRule],
+    rng: np.random.Generator,
+    *,
+    mode_probabilities: Mapping[str, float] | None = None,
+) -> FactorGene | None:
+    """Sample a gene, returning None instead of aborting the GA on sampler errors."""
+
+    try:
+        return random_gene(field_rules, rng, mode_probabilities=mode_probabilities)
+    except Exception:
+        return None
 
 
 def make_offspring(
@@ -267,14 +357,39 @@ def make_offspring(
         right = shuffled[(i + 1) % len(shuffled)]
 
         if rng.random() < config.crossover_prob:
-            child_a, child_b = crossover_genes(left, right, field_rules, rng)
+            try:
+                child_a, child_b = crossover_genes(
+                    left,
+                    right,
+                    field_rules,
+                    rng,
+                    mode_probabilities=config.mode_probabilities,
+                )
+            except Exception:
+                child_a, child_b = left, right
         else:
             child_a, child_b = left, right
 
         if rng.random() < config.mutation_prob:
-            child_a = mutate_one_parameter(child_a, field_rules, rng)
+            try:
+                child_a = mutate_one_parameter(
+                    child_a,
+                    field_rules,
+                    rng,
+                    mode_probabilities=config.mode_probabilities,
+                )
+            except Exception:
+                child_a = left
         if rng.random() < config.mutation_prob:
-            child_b = mutate_one_parameter(child_b, field_rules, rng)
+            try:
+                child_b = mutate_one_parameter(
+                    child_b,
+                    field_rules,
+                    rng,
+                    mode_probabilities=config.mode_probabilities,
+                )
+            except Exception:
+                child_b = right
 
         children.extend([child_a, child_b])
 
@@ -298,8 +413,20 @@ def evaluate_gene_on_train(
         return EvaluatedGene(gene=gene, train_score=score, generation=generation, error=error)
 
     try:
+        neutralize_industry = should_neutralize_industry(config.industry_scope)
         if eval_context is None:
-            factor = calculate_factor(gene, cache)
+            if normalize_barra_style_fields(config.barra_style_fields):
+                raise RuntimeError(
+                    "Barra-neutralized NSGA objective requires TorchEvalContext; "
+                    "set use_gpu=True or pass eval_context explicitly"
+                )
+            factor = calculate_factor(
+                gene,
+                cache,
+                neutralize_industry=neutralize_industry,
+                size_field=config.size_field,
+                use_log_size=config.use_log_size,
+            )
             score = evaluate_factor(
                 factor=factor,
                 label=cache.label,
@@ -311,7 +438,13 @@ def evaluate_gene_on_train(
         else:
             from .torch_backend import calculate_factor_tensor, evaluate_factor_tensor
 
-            factor = calculate_factor_tensor(gene, eval_context)
+            factor = calculate_factor_tensor(
+                gene,
+                eval_context,
+                neutralize_industry=neutralize_industry,
+                size_field=config.size_field,
+                use_log_size=config.use_log_size,
+            )
             score = evaluate_factor_tensor(
                 factor=factor,
                 ctx=eval_context,
@@ -372,6 +505,8 @@ def _refill_population(
     field_rules: Mapping[str, FieldRule],
     target_size: int,
     rng: np.random.Generator,
+    *,
+    mode_probabilities: Mapping[str, float] | None = None,
 ) -> list[FactorGene]:
     """Add random legal genes if de-duplication made a population too small."""
 
@@ -379,13 +514,29 @@ def _refill_population(
     attempts = 0
     max_attempts = max(1_000, target_size * 100)
     while len(output) < target_size and attempts < max_attempts:
-        output = _deduplicate_genes(output + [random_gene(field_rules, rng)])
+        sampled = _try_random_gene(
+            field_rules,
+            rng,
+            mode_probabilities=mode_probabilities,
+        )
+        if sampled is not None:
+            output = _deduplicate_genes(output + [sampled])
         attempts += 1
     while len(output) < target_size:
         # The semantic search space can be smaller than a requested production
         # population after de-duplication. Allow duplicate fillers rather than
         # looping forever; score_cache still prevents repeated expensive work.
-        output.append(random_gene(field_rules, rng))
+        sampled = _try_random_gene(
+            field_rules,
+            rng,
+            mode_probabilities=mode_probabilities,
+        )
+        if sampled is not None:
+            output.append(sampled)
+        elif output:
+            output.append(output[int(rng.integers(len(output)))])
+        else:
+            raise RuntimeError("failed to sample any legal gene for population refill")
     return output[:target_size]
 
 
@@ -400,6 +551,7 @@ def run_ga_search(
 
     config = config or GAConfig()
     rng = np.random.default_rng(config.random_seed)
+    barra_style_fields = normalize_barra_style_fields(config.barra_style_fields)
 
     if config.use_gpu and eval_context is None:
         from .torch_backend import TorchEvalContext
@@ -408,10 +560,37 @@ def run_ga_search(
             cache=cache,
             device=config.device,
             cache_on_device=config.cache_on_device,
+            barra_style_fields=barra_style_fields,
+            barra_corr_threshold=config.barra_corr_threshold,
+            barra_max_styles=config.barra_max_styles,
+        )
+    elif eval_context is None and barra_style_fields:
+        raise ValueError(
+            "barra_style_fields were provided but no TorchEvalContext is active; "
+            "set GAConfig(use_gpu=True, barra_style_fields=...) for a real neutralized_icir objective"
         )
 
-    population = [random_gene(field_rules, rng) for _ in range(config.population_size)]
-    population = _refill_population(population, field_rules, config.population_size, rng)
+    population: list[FactorGene] = []
+    init_attempts = 0
+    max_init_attempts = max(1_000, config.population_size * 100)
+    while len(population) < config.population_size and init_attempts < max_init_attempts:
+        sampled = _try_random_gene(
+            field_rules,
+            rng,
+            mode_probabilities=config.mode_probabilities,
+        )
+        if sampled is not None:
+            population.append(sampled)
+        init_attempts += 1
+    if not population:
+        raise RuntimeError("failed to sample any legal gene for initial population")
+    population = _refill_population(
+        population,
+        field_rules,
+        config.population_size,
+        rng,
+        mode_probabilities=config.mode_probabilities,
+    )
 
     score_cache: dict[tuple[object, ...], tuple[FactorScore, str]] = {}
     evaluated_population = evaluate_population_on_train(
@@ -435,7 +614,13 @@ def run_ga_search(
     for generation in generations:
         parent_genes = [item.gene for item in evaluated_population]
         offspring = make_offspring(parent_genes, field_rules, config, rng)
-        offspring = _refill_population(offspring, field_rules, config.population_size, rng)
+        offspring = _refill_population(
+            offspring,
+            field_rules,
+            config.population_size,
+            rng,
+            mode_probabilities=config.mode_probabilities,
+        )
 
         evaluated_offspring = evaluate_population_on_train(
             genes=offspring,
@@ -468,6 +653,9 @@ def validate_population(
     commission_rate: float = 0.0003,
     slippage_rate: float = 0.0002,
     stamp_tax_rate: float = 0.001,
+    size_field: str = "barra_size",
+    use_log_size: bool | None = None,
+    industry_scope: str | Sequence[str] | None = None,
     eval_context: object | None = None,
     show_progress: bool = False,
 ) -> list[EvaluatedGene]:
@@ -480,6 +668,7 @@ def validate_population(
     criteria = criteria or ValidationCriteria()
     output: list[EvaluatedGene] = []
     pnl_n_groups = _n_groups_from_top_fraction(ndcg_top_fraction)
+    neutralize_industry = should_neutralize_industry(industry_scope)
 
     iterator = _progress_iter(
         evaluated_population,
@@ -490,7 +679,13 @@ def validate_population(
     for item in iterator:
         try:
             if eval_context is None:
-                factor = calculate_factor(item.gene, cache)
+                factor = calculate_factor(
+                    item.gene,
+                    cache,
+                    neutralize_industry=neutralize_industry,
+                    size_field=size_field,
+                    use_log_size=use_log_size,
+                )
                 valid_score = evaluate_factor(
                     factor=factor,
                     label=cache.label,
@@ -521,7 +716,13 @@ def validate_population(
                     evaluate_factor_tensor,
                 )
 
-                factor = calculate_factor_tensor(item.gene, eval_context)
+                factor = calculate_factor_tensor(
+                    item.gene,
+                    eval_context,
+                    neutralize_industry=neutralize_industry,
+                    size_field=size_field,
+                    use_log_size=use_log_size,
+                )
                 valid_score = evaluate_factor_tensor(
                     factor=factor,
                     ctx=eval_context,
@@ -595,7 +796,7 @@ def evaluated_to_frame(evaluated: list[EvaluatedGene]) -> pd.DataFrame:
 
     df = pd.DataFrame(rows)
     if not df.empty:
-        objective_cols = ["train_abs_rank_ic", "train_ic_win_rate", "train_ndcg_at_k"]
+        objective_cols = ["train_rank_ic_ir", "train_ndcg_at_k", "train_neutralized_icir"]
         existing = [col for col in objective_cols if col in df.columns]
         df = df.sort_values(existing, ascending=[False] * len(existing)).reset_index(drop=True)
     return df

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -89,6 +90,21 @@ def main() -> None:
     parser.add_argument("--label-col", default="label_20d")
     parser.add_argument("--tradeable-col", default="is_tradeable")
     parser.add_argument("--industry-col", default="industry_code")
+    parser.add_argument("--size-field", default=None, help="Cached Barra size field used for size neutralization.")
+    parser.add_argument(
+        "--industry-scope",
+        nargs="*",
+        default=None,
+        help="Single industry name skips industry neutralization; use 'all' or multiple names to enable it.",
+    )
+    parser.add_argument(
+        "--barra-style-fields",
+        nargs="*",
+        default=None,
+        help="Cached z-scored Barra style fields used for dynamic neutralized ICIR.",
+    )
+    parser.add_argument("--barra-corr-threshold", type=float, default=0.30)
+    parser.add_argument("--barra-max-styles", type=int, default=2)
     parser.add_argument("--result-dir", type=Path, default=RESULT_DIR)
     parser.add_argument("--prefix", default="mock_ga_gpu")
 
@@ -118,6 +134,13 @@ def main() -> None:
     args = parser.parse_args()
 
     field_rules = load_field_rules(args.meta_path)
+    metadata_config = json.loads(args.meta_path.read_text(encoding="utf-8"))
+    size_field = args.size_field or str(metadata_config.get("size_field", "barra_size"))
+    barra_style_fields = tuple(
+        args.barra_style_fields
+        if args.barra_style_fields is not None
+        else metadata_config.get("barra_style_fields", ())
+    )
     panel = load_panel(args.data_path)
     cache = build_transform_cache(
         panel,
@@ -125,6 +148,7 @@ def main() -> None:
         label_col=args.label_col,
         tradeable_col=args.tradeable_col,
         industry_col=args.industry_col,
+        extra_current_fields=[size_field, *barra_style_fields],
     )
     train_dates, valid_dates = make_train_valid_dates(
         cache.label.index,
@@ -144,6 +168,11 @@ def main() -> None:
         ndcg_k=None,
         ndcg_top_fraction=args.ndcg_top_fraction,
         min_coverage=args.min_coverage,
+        size_field=size_field,
+        industry_scope=args.industry_scope,
+        barra_style_fields=barra_style_fields,
+        barra_corr_threshold=args.barra_corr_threshold,
+        barra_max_styles=args.barra_max_styles,
         use_gpu=True,
         device=args.device,
         cache_on_device=args.cache_on_device,
@@ -154,6 +183,9 @@ def main() -> None:
         cache=cache,
         device=config.device,
         cache_on_device=config.cache_on_device,
+        barra_style_fields=config.barra_style_fields,
+        barra_corr_threshold=config.barra_corr_threshold,
+        barra_max_styles=config.barra_max_styles,
     )
 
     result = run_ga_search(
@@ -179,6 +211,8 @@ def main() -> None:
         ndcg_top_fraction=config.ndcg_top_fraction,
         label_horizon=args.label_horizon,
         rebalance_freq=rebalance_days,
+        size_field=config.size_field,
+        industry_scope=config.industry_scope,
         eval_context=torch_context,
         show_progress=args.show_progress,
     )
@@ -199,8 +233,13 @@ def main() -> None:
     cols = [
         "expression",
         "train_abs_rank_ic",
+        "train_rank_ic_ir",
         "train_ic_win_rate",
         "train_ndcg_at_k",
+        "train_neutralized_icir",
+        "train_barra_max_abs_corr",
+        "train_barra_selected_count",
+        "train_barra_selected_styles",
         "train_coverage",
         "valid_abs_rank_ic",
         "valid_ic_win_rate",

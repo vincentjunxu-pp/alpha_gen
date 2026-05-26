@@ -8,7 +8,7 @@
   ],
   "shape": [
     48000,
-    28
+    40
   ],
   "n_dates": 600,
   "n_contracts": 80,
@@ -18,8 +18,11 @@
     "Mock daily TMT stock panel for local debugging only.",
     "Datetime uses 15:00:00 to satisfy alpha_gen pivot validation.",
     "market_cap is stored as log market cap and should not be logged again inside alpha_gen.",
+    "barra_size is the default size neutralization field; market_cap remains a legacy fallback.",
+    "Barra style fields are cross-sectionally z-scored controls and are not searchable gene fields.",
     "Fundamental fields are quarterly values with a 20-business-day disclosure lag, then forward-filled to daily.",
-    "label_20d is future 20-trading-day return and should be used only as the training label."
+    "label_1d, label_5d, and label_20d are future returns; pick one label column explicitly when building the cache.",
+    "resi_pair and multi_resi require additive controls with matching unit_type/add_group/accounting transform semantics."
   ],
   "numeric_fields": [
     "open",
@@ -47,7 +50,19 @@
     "rating_score_30d",
     "rating_score_90d",
     "rating_score_180d",
+    "barra_size",
+    "barra_beta",
+    "barra_momentum",
+    "barra_residual_volatility",
+    "barra_non_linear_size",
+    "barra_book_to_price",
+    "barra_liquidity",
+    "barra_earnings_yield",
+    "barra_growth",
+    "barra_leverage",
     "is_tradeable",
+    "label_1d",
+    "label_5d",
     "label_20d"
   ],
   "categorical_fields": [
@@ -62,7 +77,13 @@
       "allow_lag": false,
       "allow_diff": false,
       "allow_pct": true,
-      "allow_std": true
+      "allow_std": false,
+      "family": "price",
+      "unit_type": "price",
+      "statement": "market",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price"
     },
     "market_cap": {
       "can_y": false,
@@ -72,7 +93,13 @@
       "allow_lag": false,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": true
+      "allow_std": false,
+      "family": "size",
+      "unit_type": "currency",
+      "statement": "market",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "market_value"
     },
     "enterprise_value": {
       "can_y": false,
@@ -82,7 +109,13 @@
       "allow_lag": false,
       "allow_diff": false,
       "allow_pct": false,
-      "allow_std": false
+      "allow_std": false,
+      "family": "size",
+      "unit_type": "currency",
+      "statement": "market",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "market_value"
     },
     "rating_score_30d": {
       "can_y": true,
@@ -92,7 +125,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": false,
-      "allow_std": true
+      "allow_std": false,
+      "family": "analyst",
+      "unit_type": "score",
+      "statement": "analyst",
+      "period_type": "30d",
+      "direction": 1,
+      "add_group": "score"
     },
     "rating_score_90d": {
       "can_y": true,
@@ -102,7 +141,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": false,
-      "allow_std": true
+      "allow_std": false,
+      "family": "analyst",
+      "unit_type": "score",
+      "statement": "analyst",
+      "period_type": "90d",
+      "direction": 1,
+      "add_group": "score"
     },
     "rating_score_180d": {
       "can_y": true,
@@ -112,7 +157,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": false,
-      "allow_std": true
+      "allow_std": false,
+      "family": "analyst",
+      "unit_type": "score",
+      "statement": "analyst",
+      "period_type": "180d",
+      "direction": 1,
+      "add_group": "score"
     },
     "book_equity": {
       "can_y": true,
@@ -122,7 +173,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "size",
+      "unit_type": "currency",
+      "statement": "balance_sheet",
+      "period_type": "unknown",
+      "direction": 1,
+      "add_group": "equity"
     },
     "total_assets": {
       "can_y": true,
@@ -132,7 +189,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "size",
+      "unit_type": "currency",
+      "statement": "balance_sheet",
+      "period_type": "unknown",
+      "direction": 1,
+      "add_group": "asset"
     },
     "revenue_mrq": {
       "can_y": true,
@@ -142,7 +205,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "profitability",
+      "unit_type": "currency",
+      "statement": "income",
+      "period_type": "mrq",
+      "direction": 1,
+      "add_group": "revenue"
     },
     "revenue_ttm": {
       "can_y": true,
@@ -152,7 +221,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "profitability",
+      "unit_type": "currency",
+      "statement": "income",
+      "period_type": "ttm",
+      "direction": 1,
+      "add_group": "revenue"
     },
     "operating_profit_mrq": {
       "can_y": true,
@@ -162,7 +237,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "profitability",
+      "unit_type": "currency",
+      "statement": "income",
+      "period_type": "mrq",
+      "direction": 1,
+      "add_group": "profit"
     },
     "operating_profit_ttm": {
       "can_y": true,
@@ -172,7 +253,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "profitability",
+      "unit_type": "currency",
+      "statement": "income",
+      "period_type": "ttm",
+      "direction": 1,
+      "add_group": "profit"
     },
     "net_profit_mrq": {
       "can_y": true,
@@ -182,7 +269,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "profitability",
+      "unit_type": "currency",
+      "statement": "income",
+      "period_type": "mrq",
+      "direction": 1,
+      "add_group": "profit"
     },
     "net_profit_ttm": {
       "can_y": true,
@@ -192,7 +285,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "profitability",
+      "unit_type": "currency",
+      "statement": "income",
+      "period_type": "ttm",
+      "direction": 1,
+      "add_group": "profit"
     },
     "rd_expense_ttm": {
       "can_y": true,
@@ -202,7 +301,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "quality",
+      "unit_type": "currency",
+      "statement": "income",
+      "period_type": "ttm",
+      "direction": -1,
+      "add_group": "expense"
     },
     "capex_ttm": {
       "can_y": true,
@@ -212,7 +317,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "quality",
+      "unit_type": "currency",
+      "statement": "cashflow",
+      "period_type": "ttm",
+      "direction": -1,
+      "add_group": "expense"
     },
     "free_cash_flow_ttm": {
       "can_y": true,
@@ -222,7 +333,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "cashflow",
+      "unit_type": "currency",
+      "statement": "cashflow",
+      "period_type": "ttm",
+      "direction": 1,
+      "add_group": "cashflow"
     },
     "forecast_revenue_ry": {
       "can_y": true,
@@ -232,7 +349,13 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "growth",
+      "unit_type": "currency",
+      "statement": "analyst",
+      "period_type": "ry",
+      "direction": 1,
+      "add_group": "revenue"
     },
     "forecast_net_profit_ry": {
       "can_y": true,
@@ -242,7 +365,38 @@
       "allow_lag": true,
       "allow_diff": true,
       "allow_pct": true,
-      "allow_std": false
+      "allow_std": false,
+      "family": "growth",
+      "unit_type": "currency",
+      "statement": "analyst",
+      "period_type": "ry",
+      "direction": 1,
+      "add_group": "profit"
     }
-  }
+  },
+  "size_field": "barra_size",
+  "barra_style_fields": [
+    "barra_size",
+    "barra_beta",
+    "barra_momentum",
+    "barra_residual_volatility",
+    "barra_non_linear_size",
+    "barra_book_to_price",
+    "barra_liquidity",
+    "barra_earnings_yield",
+    "barra_growth",
+    "barra_leverage"
+  ],
+  "extra_current_fields": [
+    "barra_size",
+    "barra_beta",
+    "barra_momentum",
+    "barra_residual_volatility",
+    "barra_non_linear_size",
+    "barra_book_to_price",
+    "barra_liquidity",
+    "barra_earnings_yield",
+    "barra_growth",
+    "barra_leverage"
+  ]
 }

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -42,10 +42,27 @@ class TorchEvalContext:
     device: torch.device | str = "auto"
     dtype: torch.dtype = torch.float32
     cache_on_device: bool = True
+    barra_style_fields: Sequence[str] | str = ()
+    barra_corr_threshold: float = 0.30
+    barra_max_styles: int = 2
     _tensor_cache: dict[tuple[object, ...], torch.Tensor] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.device = resolve_device(str(self.device))
+        raw_barra_fields = [self.barra_style_fields] if isinstance(self.barra_style_fields, str) else self.barra_style_fields
+        self.barra_style_fields = tuple(
+            dict.fromkeys(
+                text
+                for field in raw_barra_fields
+                if field is not None
+                for text in [str(field).strip()]
+                if text
+            )
+        )
+        if self.barra_corr_threshold < 0:
+            raise ValueError("barra_corr_threshold must be non-negative")
+        if self.barra_max_styles <= 0:
+            raise ValueError("barra_max_styles must be positive")
         self._validate_cache_layout()
         self.date_index = pd.DatetimeIndex(self.cache.label.index)
 
@@ -86,7 +103,13 @@ class TorchEvalContext:
 
     def get_current(self, field: str, use_log: bool) -> torch.Tensor:
         key = ("current", field, use_log)
-        return self._frame_to_tensor(key, self.cache.current[(field, use_log)])
+        source_key = (field, use_log)
+        if source_key not in self.cache.current:
+            raise KeyError(
+                f"field {field!r} with use_log={use_log} is not cached; "
+                "include it in metadata/field_rules or cache.current before building TorchEvalContext"
+            )
+        return self._frame_to_tensor(key, self.cache.current[source_key])
 
     def label(self) -> torch.Tensor:
         return self._frame_to_tensor(("label",), self.cache.label)
@@ -94,6 +117,50 @@ class TorchEvalContext:
     def tradeable(self) -> torch.Tensor:
         tradeable = self._frame_to_tensor(("tradeable",), self.cache.tradeable)
         return torch.isfinite(tradeable) & (tradeable > 0)
+
+    def barra_styles(self) -> torch.Tensor:
+        """Return cached Barra style tensors as [date, contract, style].
+
+        The expected input is already cross-sectionally z-scored and NaNs have
+        been filled with 0.0. We still sanitize infinities here so the batched
+        correlation and regression kernels never receive non-finite controls.
+        """
+
+        label_shape = self.cache.label.shape
+        if not self.barra_style_fields:
+            return torch.empty(
+                (label_shape[0], label_shape[1], 0),
+                dtype=self.dtype,
+                device=self.device,
+            )
+
+        key = ("barra_styles", tuple(self.barra_style_fields))
+        if self.cache_on_device and key in self._tensor_cache:
+            return self._tensor_cache[key]
+
+        tensors = [
+            torch.nan_to_num(self.get_current(field, False), nan=0.0, posinf=0.0, neginf=0.0)
+            for field in self.barra_style_fields
+        ]
+        stacked = torch.stack(tensors, dim=2)
+        if self.cache_on_device:
+            self._tensor_cache[key] = stacked
+        return stacked
+
+    def industry_codes(self) -> torch.Tensor:
+        if self.cache.industry is None:
+            raise ValueError("industry-relative transforms require cache.industry")
+        key = ("industry_codes",)
+        if self.cache_on_device and key in self._tensor_cache:
+            return self._tensor_cache[key]
+
+        industry = self.cache.industry.reindex(index=self.cache.label.index, columns=self.cache.label.columns)
+        codes, _uniques = pd.factorize(industry.to_numpy(dtype=object).ravel(), sort=True, use_na_sentinel=True)
+        codes_array = codes.reshape(industry.shape)
+        tensor = torch.as_tensor(codes_array, dtype=torch.long, device=self.device)
+        if self.cache_on_device:
+            self._tensor_cache[key] = tensor
+        return tensor
 
     def date_positions(self, dates: pd.DatetimeIndex | None) -> torch.Tensor | None:
         if dates is None:
@@ -115,6 +182,12 @@ def _safe_divide(left: torch.Tensor, right: torch.Tensor, eps: float = 1e-2) -> 
     return torch.where(right.abs() > eps, left / right, _nan_like(left))
 
 
+def _signed_log1p_torch(values: torch.Tensor) -> torch.Tensor:
+    """Torch equivalent of sign(x) * log(1 + abs(x))."""
+
+    return torch.sign(values) * torch.log1p(values.abs())
+
+
 def _apply_mask(values: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     return torch.where(mask, values, _nan_like(values))
 
@@ -126,33 +199,17 @@ def _shift_tensor(values: torch.Tensor, periods: int) -> torch.Tensor:
     return shifted
 
 
-def _rolling_std_torch(values: torch.Tensor, window: int) -> torch.Tensor:
-    out = _nan_like(values)
-    if window <= 1 or values.shape[0] < window:
-        return out
-
-    windows = values.unfold(0, window, 1)
-    valid = torch.isfinite(windows)
-    count = valid.sum(dim=2).to(values.dtype)
-    enough = count >= window
-    filled = torch.where(valid, windows, torch.zeros_like(windows))
-    mean = filled.sum(dim=2) / torch.clamp(count, min=1.0)
-    centered = torch.where(valid, windows - mean.unsqueeze(2), torch.zeros_like(windows))
-    variance = (centered * centered).sum(dim=2) / torch.clamp(count - 1.0, min=1.0)
-    std = torch.sqrt(variance)
-    out[window - 1 :] = torch.where(enough, std, torch.full_like(std, float("nan")))
-    return out
-
-
 def apply_transform_torch(values: torch.Tensor, transform: str) -> torch.Tensor:
     """Apply one same-contract historical transform without future data."""
 
     if transform == "current":
         return values
     if transform == "log":
-        return torch.where(values > 0, torch.log(values), _nan_like(values))
+        return _signed_log1p_torch(values)
     if transform == "zscore":
         return cs_zscore_torch(values)
+    if transform == "rank_pct":
+        return cs_rank_pct_torch(values)
 
     if transform.endswith("_2q"):
         window = TRANSFORM_WINDOWS["2q"]
@@ -166,8 +223,6 @@ def apply_transform_torch(values: torch.Tensor, transform: str) -> torch.Tensor:
     if transform.startswith("pct_"):
         shifted = _shift_tensor(values, window)
         return torch.where(shifted != 0, values / shifted - 1.0, _nan_like(values))
-    if transform.startswith("std_"):
-        return _rolling_std_torch(values, window)
     raise ValueError(f"unknown transform: {transform!r}")
 
 
@@ -188,6 +243,92 @@ def cs_zscore_torch(values: torch.Tensor, mask: torch.Tensor | None = None, eps:
     std = torch.sqrt(variance)
     zscore = (values - mean) / (std + eps)
     return torch.where(enough & valid, zscore, _nan_like(values))
+
+
+def cs_rank_pct_torch(values: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
+    """Row-wise percentile ranks, matching pandas rank(pct=True)."""
+
+    valid = torch.isfinite(values)
+    if mask is not None:
+        valid = valid & mask
+    ranked_values = torch.where(valid, values, _nan_like(values))
+    ranks = nan_rank_torch(ranked_values)
+    n = valid.sum(dim=1, keepdim=True).to(values.dtype)
+    pct = ranks / torch.clamp(n, min=1.0)
+    return torch.where(valid & (n >= 1), pct, _nan_like(values))
+
+
+def industry_zscore_torch(
+    values: torch.Tensor,
+    industry_codes: torch.Tensor,
+    mask: torch.Tensor | None = None,
+    eps: float = 1e-8,
+) -> torch.Tensor:
+    """Row-wise z-score inside each industry group."""
+
+    valid = torch.isfinite(values) & (industry_codes >= 0)
+    if mask is not None:
+        valid = valid & mask
+
+    out = _nan_like(values)
+    unique_codes = torch.unique(industry_codes[valid])
+    for code in unique_codes:
+        group_valid = valid & (industry_codes == code)
+        n = group_valid.sum(dim=1, keepdim=True).to(values.dtype)
+        enough = n >= 2
+        values0 = torch.where(group_valid, values, torch.zeros_like(values))
+        mean = values0.sum(dim=1, keepdim=True) / torch.clamp(n, min=1.0)
+        centered = torch.where(group_valid, values - mean, torch.zeros_like(values))
+        variance = (centered * centered).sum(dim=1, keepdim=True) / torch.clamp(n - 1.0, min=1.0)
+        std = torch.sqrt(variance)
+        zscore = (values - mean) / (std + eps)
+        out = torch.where(enough & group_valid & (std > 0), zscore, out)
+    return out
+
+
+def industry_rank_pct_torch(
+    values: torch.Tensor,
+    industry_codes: torch.Tensor,
+    mask: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Row-wise percentile rank inside each industry group."""
+
+    valid = torch.isfinite(values) & (industry_codes >= 0)
+    if mask is not None:
+        valid = valid & mask
+
+    out = _nan_like(values)
+    unique_codes = torch.unique(industry_codes[valid])
+    for code in unique_codes:
+        group_valid = valid & (industry_codes == code)
+        group_values = torch.where(group_valid, values, _nan_like(values))
+        ranks = nan_rank_torch(group_values)
+        n = group_valid.sum(dim=1, keepdim=True).to(values.dtype)
+        pct = ranks / torch.clamp(n, min=1.0)
+        out = torch.where(group_valid & (n >= 1), pct, out)
+    return out
+
+
+def industry_neutralize_torch(
+    values: torch.Tensor,
+    industry_codes: torch.Tensor,
+    mask: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Remove industry dummy exposure by demeaning within date/industry groups."""
+
+    valid = torch.isfinite(values) & (industry_codes >= 0)
+    if mask is not None:
+        valid = valid & mask
+
+    out = _nan_like(values)
+    unique_codes = torch.unique(industry_codes[valid])
+    for code in unique_codes:
+        group_valid = valid & (industry_codes == code)
+        n = group_valid.sum(dim=1, keepdim=True).to(values.dtype)
+        values0 = torch.where(group_valid, values, torch.zeros_like(values))
+        mean = values0.sum(dim=1, keepdim=True) / torch.clamp(n, min=1.0)
+        out = torch.where(group_valid & (n > 0), values - mean, out)
+    return out
 
 
 def cross_sectional_residual_torch(
@@ -233,11 +374,176 @@ def cross_sectional_residual_torch(
     return residual
 
 
+def cross_sectional_multi_residual_torch(
+    y: torch.Tensor,
+    controls: list[torch.Tensor],
+    mask: torch.Tensor | None = None,
+    eps: float = 1e-6,
+) -> torch.Tensor:
+    """Vectorized cross-sectional residual y ~ controls for every date."""
+
+    if not controls:
+        return y - torch.nanmean(y, dim=1, keepdim=True)
+
+    valid = torch.isfinite(y)
+    for control in controls:
+        valid = valid & torch.isfinite(control)
+    if mask is not None:
+        valid = valid & mask
+
+    k = len(controls)
+    n = valid.sum(dim=1, keepdim=True).to(y.dtype)
+    enough = n >= (k + 2)
+
+    columns = [torch.ones_like(y), *controls]
+    design = torch.stack(columns, dim=2)
+    design0 = torch.where(valid.unsqueeze(2), design, torch.zeros_like(design))
+    y0 = torch.where(valid, y, torch.zeros_like(y)).unsqueeze(2)
+
+    xt = design0.transpose(1, 2)
+    xtx = torch.matmul(xt, design0)
+    xty = torch.matmul(xt, y0)
+    eye = torch.eye(k + 1, dtype=y.dtype, device=y.device).unsqueeze(0)
+    beta = torch.linalg.solve(xtx + eye * eps, xty)
+    fitted = torch.matmul(design, beta).squeeze(2)
+    residual = y - fitted
+    return torch.where(enough & valid, residual, _nan_like(y))
+
+
+@dataclass(frozen=True)
+class BarraNeutralizationResult:
+    """Diagnostics from dynamic Barra style neutralization."""
+
+    residual_factor: torch.Tensor
+    abs_mean_corr: torch.Tensor
+    selected_mask: torch.Tensor
+
+
+def dynamic_barra_neutralize_torch(
+    factor: torch.Tensor,
+    barra_styles: torch.Tensor,
+    *,
+    mask: torch.Tensor | None = None,
+    corr_threshold: float = 0.30,
+    max_styles: int = 2,
+    ridge: float = 1e-6,
+) -> BarraNeutralizationResult:
+    """动态寻找最大 Barra 暴露并做截面残差化。
+
+    参数形状：
+    - factor: [T, N]，待评估的原因子矩阵。
+    - barra_styles: [T, N, K]，已按截面 z-score 且 NaN 已填 0.0 的 Barra 风格矩阵。
+    - mask: [T, N]，可交易或评估股票池掩码。
+
+    实现要点：
+    - 相关性计算使用一次 einsum 完成所有日期和所有风格的点乘。
+    - 风格筛选是全张量 top-k；回归使用批量正规方程，没有逐日期循环。
+    - 若没有任何风格超过阈值，残差因子直接返回原因子，避免引入无意义扰动。
+    """
+
+    if factor.ndim != 2:
+        raise ValueError(f"factor must be 2D [date, contract], got shape {tuple(factor.shape)}")
+    if barra_styles.ndim != 3:
+        raise ValueError(f"barra_styles must be 3D [date, contract, style], got shape {tuple(barra_styles.shape)}")
+    if barra_styles.shape[:2] != factor.shape:
+        raise ValueError("factor and barra_styles must share the same date/contract dimensions")
+    if corr_threshold < 0:
+        raise ValueError("corr_threshold must be non-negative")
+    if max_styles <= 0:
+        raise ValueError("max_styles must be positive")
+    if ridge < 0:
+        raise ValueError("ridge must be non-negative")
+
+    n_styles = barra_styles.shape[2]
+    empty_corr = torch.empty((0,), dtype=factor.dtype, device=factor.device)
+    if n_styles == 0:
+        return BarraNeutralizationResult(
+            residual_factor=factor,
+            abs_mean_corr=empty_corr,
+            selected_mask=torch.empty((0,), dtype=torch.bool, device=factor.device),
+        )
+
+    valid = torch.isfinite(factor)
+    if mask is not None:
+        if mask.shape != factor.shape:
+            raise ValueError("mask must share the same shape as factor")
+        mask = mask.to(torch.bool)
+        valid = valid & mask
+
+    # 1. 将原因子按截面 z-score 后填 0，和预处理好的 Barra 风格做批量点乘。
+    factor_z = torch.nan_to_num(cs_zscore_torch(factor, mask=valid), nan=0.0, posinf=0.0, neginf=0.0)
+    barra_z = torch.nan_to_num(barra_styles, nan=0.0, posinf=0.0, neginf=0.0)
+    if mask is not None:
+        barra_z = torch.where(mask.unsqueeze(2), barra_z, torch.zeros_like(barra_z))
+
+    count = valid.sum(dim=1).to(factor.dtype)
+    enough_for_corr = count >= 2
+    denom = torch.clamp(count - 1.0, min=1.0).unsqueeze(1)
+    daily_corr = torch.einsum("tn,tnk->tk", factor_z, barra_z) / denom
+    daily_corr = torch.where(enough_for_corr.unsqueeze(1), daily_corr, torch.full_like(daily_corr, float("nan")))
+
+    corr_finite = torch.isfinite(daily_corr)
+    corr_obs = corr_finite.sum(dim=0)
+    mean_corr = torch.where(
+        corr_obs > 0,
+        torch.where(corr_finite, daily_corr, torch.zeros_like(daily_corr)).sum(dim=0)
+        / torch.clamp(corr_obs.to(factor.dtype), min=1.0),
+        torch.zeros((n_styles,), dtype=factor.dtype, device=factor.device),
+    )
+    abs_mean_corr = mean_corr.abs()
+
+    # 2. 只在超过阈值的风格中取全局 top-k，最多剥离 max_styles 个 Barra 暴露。
+    k_eff = min(int(max_styles), n_styles)
+    neg_inf = torch.full_like(abs_mean_corr, -float("inf"))
+    eligible_scores = torch.where(abs_mean_corr > corr_threshold, abs_mean_corr, neg_inf)
+    top_scores, top_idx = torch.topk(eligible_scores, k=k_eff, largest=True, sorted=True)
+    top_valid = torch.isfinite(top_scores)
+    selected_mask = torch.zeros((n_styles,), dtype=torch.bool, device=factor.device)
+    selected_mask.scatter_(0, top_idx, top_valid)
+    selected_count = int(top_valid.sum().detach().cpu().item())
+
+    if selected_count == 0:
+        return BarraNeutralizationResult(
+            residual_factor=factor,
+            abs_mean_corr=abs_mean_corr,
+            selected_mask=selected_mask,
+        )
+
+    # 3. 批量截面 OLS：factor ~ intercept + selected_barra_styles。
+    #    top_valid 会把未入选的占位列置零；有效自变量个数用 selected_count 控制。
+    selected_barra = barra_z.index_select(2, top_idx) * top_valid.to(factor.dtype).view(1, 1, k_eff)
+    intercept = torch.ones((*factor.shape, 1), dtype=factor.dtype, device=factor.device)
+    design = torch.cat([intercept, selected_barra], dim=2)
+
+    design0 = torch.where(valid.unsqueeze(2), design, torch.zeros_like(design))
+    y0 = torch.where(valid, factor, torch.zeros_like(factor)).unsqueeze(2)
+    xt = design0.transpose(1, 2)
+    xtx = torch.matmul(xt, design0)
+    xty = torch.matmul(xt, y0)
+
+    eye = torch.eye(k_eff + 1, dtype=factor.dtype, device=factor.device).unsqueeze(0)
+    beta = torch.linalg.solve(xtx + eye * ridge, xty)
+    fitted = torch.matmul(design, beta).squeeze(2)
+    residual = factor - fitted
+
+    min_obs = selected_count + 2
+    enough_for_reg = valid.sum(dim=1, keepdim=True) >= min_obs
+    residual = torch.where(enough_for_reg & valid, residual, _nan_like(factor))
+    return BarraNeutralizationResult(
+        residual_factor=residual,
+        abs_mean_corr=abs_mean_corr,
+        selected_mask=selected_mask,
+    )
+
+
 def calculate_factor_tensor(
     gene: FactorGene,
     ctx: TorchEvalContext,
     *,
     neutralize_size: bool = True,
+    neutralize_industry: bool = False,
+    size_field: str = "barra_size",
+    use_log_size: bool | None = None,
     tradeable_only: bool = True,
 ) -> torch.Tensor:
     """Calculate one structured-expression factor directly on torch tensors."""
@@ -251,6 +557,12 @@ def calculate_factor_tensor(
     def feature(field: str, transform: str) -> torch.Tensor:
         if transform == "zscore":
             return cs_zscore_torch(ctx.get_current(field, False), mask=tradeable_mask)
+        if transform == "rank_pct":
+            return cs_rank_pct_torch(ctx.get_current(field, False), mask=tradeable_mask)
+        if transform == "ind_zscore":
+            return industry_zscore_torch(ctx.get_current(field, False), ctx.industry_codes(), mask=tradeable_mask)
+        if transform == "ind_rank_pct":
+            return industry_rank_pct_torch(ctx.get_current(field, False), ctx.industry_codes(), mask=tradeable_mask)
         transformed = apply_transform_torch(ctx.get_current(field, False), transform)
         return _apply_mask(transformed, tradeable_mask) if tradeable_mask is not None else transformed
 
@@ -270,10 +582,21 @@ def calculate_factor_tensor(
             raw = _safe_divide(a, b)
         elif gene.mode == "resi":
             raw = cross_sectional_residual_torch(a, b, mask=tradeable_mask)
-        elif gene.mode == "ratio_product":
+        elif gene.mode == "resi_pair":
+            c = feature(gene.c, gene.c_transform)
+            raw = cross_sectional_residual_torch(a, b + c, mask=tradeable_mask)
+        elif gene.mode == "multi_resi":
             c = feature(gene.c, gene.c_transform)
             d = feature(gene.d, gene.d_transform)
-            raw = _safe_divide(a, b) * _safe_divide(c, d)
+            raw = cross_sectional_residual_torch(a, b + c + d, mask=tradeable_mask)
+        elif gene.mode == "spread":
+            c = feature(gene.c, gene.c_transform)
+            d = feature(gene.d, gene.d_transform)
+            raw = _safe_divide(a, b) - _safe_divide(c, d)
+        elif gene.mode == "style_composite":
+            a_style = (feature(gene.a, "rank_pct") - 0.5) * float(ctx.field_rules[gene.a].direction)
+            b_style = (feature(gene.b, "rank_pct") - 0.5) * float(ctx.field_rules[gene.b].direction)
+            raw = combine(a_style, b_style, "+")
         else:
             left = combine(a, b, gene.left_op)
             c = feature(gene.c, gene.c_transform)
@@ -287,11 +610,16 @@ def calculate_factor_tensor(
     if tradeable_only:
         raw = _apply_mask(raw, ctx.tradeable())
 
+    if neutralize_industry:
+        raw = industry_neutralize_torch(raw, ctx.industry_codes(), mask=ctx.tradeable() if tradeable_only else None)
+
     if not neutralize_size:
         return raw
 
-    size_raw = ctx.get_current("market_cap", False)
-    size = torch.where(size_raw > 0, torch.log(size_raw), _nan_like(size_raw))
+    size_raw = ctx.get_current(size_field, False)
+    if use_log_size is None:
+        use_log_size = size_field == "market_cap"
+    size = _signed_log1p_torch(size_raw) if use_log_size else size_raw
     mask = torch.isfinite(raw) & torch.isfinite(size)
     if tradeable_only:
         mask = mask & ctx.tradeable()
@@ -451,7 +779,21 @@ def evaluate_factor_tensor(
     coverage_value = float(coverage.detach().cpu().item()) if torch.isfinite(coverage) else 0.0
 
     if ic_series.numel() == 0:
-        return FactorScore(0.0, 0.0, 0.0, 0.0, 0.0, 1, 0, coverage_value)
+        return FactorScore(
+            mean_rank_ic=0.0,
+            abs_rank_ic=0.0,
+            rank_ic_ir=0.0,
+            ic_win_rate=0.0,
+            ndcg_at_k=0.0,
+            direction=1,
+            n_ic_obs=0,
+            coverage=coverage_value,
+            neutralized_icir=0.0,
+            neutralized_mean_rank_ic=0.0,
+            neutralized_abs_rank_ic=0.0,
+            neutralized_ic_win_rate=0.0,
+            neutralized_n_ic_obs=0,
+        )
 
     mean_ic_tensor = ic_series.mean()
     direction_value = int(direction) if direction is not None else (1 if mean_ic_tensor.item() >= 0 else -1)
@@ -471,6 +813,64 @@ def evaluate_factor_tensor(
         n_groups=n_groups,
     )
 
+    # These fields are deliberately zero until a Barra style context is
+    # actually available. Do not copy raw ICIR into neutralized ICIR; that would
+    # turn an unevaluated robustness objective into a false positive.
+    neutralized_icir = 0.0
+    neutralized_mean_rank_ic = 0.0
+    neutralized_abs_rank_ic = 0.0
+    neutralized_ic_win_rate = 0.0
+    neutralized_n_ic_obs = 0
+    barra_max_abs_corr = 0.0
+    barra_selected_count = 0
+    barra_selected_styles: tuple[str, ...] = ()
+
+    if ctx.barra_style_fields:
+        barra_eval = _take_dates(ctx.barra_styles(), positions)
+        neutralization = dynamic_barra_neutralize_torch(
+            factor_eval,
+            barra_eval,
+            mask=tradeable_eval,
+            corr_threshold=ctx.barra_corr_threshold,
+            max_styles=ctx.barra_max_styles,
+        )
+        if neutralization.abs_mean_corr.numel() > 0:
+            barra_max_abs_corr = float(neutralization.abs_mean_corr.max().detach().cpu().item())
+        barra_selected_count = int(neutralization.selected_mask.sum().detach().cpu().item())
+        selected_flags = neutralization.selected_mask.detach().cpu().tolist()
+        # 记录本因子实际被剥离的 Barra 风格，便于后续排查“伪 Alpha”暴露来源。
+        barra_selected_styles = tuple(
+            field for field, selected in zip(ctx.barra_style_fields, selected_flags) if bool(selected)
+        )
+
+        # 有 Barra 上下文时必须从 residual_factor 重新计算目标 3。若没有风格
+        # 超过阈值，dynamic_barra_neutralize_torch 按规则返回 residual=factor；
+        # 这仍然是“中性化流水线评估结果”，不是简单复制 raw ICIR。
+        residual_ic = daily_rank_ic_torch(
+            neutralization.residual_factor,
+            label_eval,
+            min_cross_section_size=min_cross_section_size,
+        )
+        neutralized_n_ic_obs = int(residual_ic.numel())
+        if residual_ic.numel() > 0:
+            residual_mean_tensor = residual_ic.mean()
+            residual_oriented_ic = residual_ic * direction_value
+            residual_std = (
+                residual_ic.std(unbiased=True)
+                if residual_ic.numel() > 1
+                else torch.tensor(0.0, device=factor.device)
+            )
+            neutralized_icir = (
+                float((residual_oriented_ic.mean() / residual_std).detach().cpu().item())
+                if residual_std > 0
+                else 0.0
+            )
+            neutralized_mean_rank_ic = float(residual_mean_tensor.detach().cpu().item())
+            neutralized_abs_rank_ic = abs(neutralized_mean_rank_ic)
+            neutralized_ic_win_rate = float(
+                (residual_oriented_ic > 0).to(factor.dtype).mean().detach().cpu().item()
+            )
+
     return FactorScore(
         mean_rank_ic=mean_ic,
         abs_rank_ic=abs(mean_ic),
@@ -480,6 +880,14 @@ def evaluate_factor_tensor(
         direction=direction_value,
         n_ic_obs=int(ic_series.numel()),
         coverage=coverage_value,
+        neutralized_icir=neutralized_icir,
+        neutralized_mean_rank_ic=neutralized_mean_rank_ic,
+        neutralized_abs_rank_ic=neutralized_abs_rank_ic,
+        neutralized_ic_win_rate=neutralized_ic_win_rate,
+        neutralized_n_ic_obs=neutralized_n_ic_obs,
+        barra_max_abs_corr=barra_max_abs_corr,
+        barra_selected_count=barra_selected_count,
+        barra_selected_styles=barra_selected_styles,
     )
 
 

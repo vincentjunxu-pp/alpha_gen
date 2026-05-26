@@ -9,10 +9,10 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 # Evaluation metrics used by the multi-objective genetic algorithm.
 #
-# The 2025 report optimizes three objectives:
-#   1. |RankIC|      -> cross-sectional monotonicity
-#   2. |IC| win rate -> time-series stability after choosing factor direction
-#   3. NDCG@k       -> long-leg/top-group performance
+# The search now optimizes three maximized objectives:
+#   1. raw RankICIR        -> raw cross-sectional monotonicity stability
+#   2. raw NDCG@k          -> long-leg/top-group performance
+#   3. neutralized RankICIR -> robustness after dynamic Barra style stripping
 #
 # This module does not know about genes or mutation. It only evaluates one
 # already-calculated factor matrix against the future-return label matrix.
@@ -31,14 +31,22 @@ class FactorScore:
     direction: int
     n_ic_obs: int
     coverage: float
+    neutralized_icir: float = 0.0
+    neutralized_mean_rank_ic: float = 0.0
+    neutralized_abs_rank_ic: float = 0.0
+    neutralized_ic_win_rate: float = 0.0
+    neutralized_n_ic_obs: int = 0
+    barra_max_abs_corr: float = 0.0
+    barra_selected_count: int = 0
+    barra_selected_styles: tuple[str, ...] = ()
 
     @property
     def objectives(self) -> tuple[float, float, float]:
         """The three values NSGA-II will maximize."""
 
-        return (self.abs_rank_ic, self.ic_win_rate, self.ndcg_at_k)
+        return (self.rank_ic_ir, self.ndcg_at_k, self.neutralized_icir)
 
-    def to_dict(self) -> dict[str, float | int]:
+    def to_dict(self) -> dict[str, float | int | str]:
         """Plain dict for CSV/JSON logging."""
 
         return {
@@ -50,6 +58,14 @@ class FactorScore:
             "direction": self.direction,
             "n_ic_obs": self.n_ic_obs,
             "coverage": self.coverage,
+            "neutralized_icir": self.neutralized_icir,
+            "neutralized_mean_rank_ic": self.neutralized_mean_rank_ic,
+            "neutralized_abs_rank_ic": self.neutralized_abs_rank_ic,
+            "neutralized_ic_win_rate": self.neutralized_ic_win_rate,
+            "neutralized_n_ic_obs": self.neutralized_n_ic_obs,
+            "barra_max_abs_corr": self.barra_max_abs_corr,
+            "barra_selected_count": self.barra_selected_count,
+            "barra_selected_styles": ",".join(self.barra_selected_styles),
         }
 
 
@@ -276,10 +292,9 @@ def evaluate_factor(
 ) -> FactorScore:
     """Evaluate one factor on a date range.
 
-    Direction handling is important. The report's first objective is |IC|, so a
-    negative-IC factor can still be useful after multiplying by -1. We therefore
-    choose the direction from mean RankIC, then compute IC win rate and NDCG on
-    the direction-adjusted factor.
+    Direction handling is important. A negative-IC factor can still be useful
+    after multiplying by -1. We therefore choose the direction from mean RankIC,
+    then compute ICIR, IC win rate and NDCG on the direction-adjusted factor.
     """
 
     if direction is not None and direction not in {-1, 1}:
@@ -310,6 +325,11 @@ def evaluate_factor(
             direction=1,
             n_ic_obs=0,
             coverage=_coverage(factor_eval, label_eval, tradeable_eval),
+            neutralized_icir=0.0,
+            neutralized_mean_rank_ic=0.0,
+            neutralized_abs_rank_ic=0.0,
+            neutralized_ic_win_rate=0.0,
+            neutralized_n_ic_obs=0,
         )
 
     direction = int(direction) if direction is not None else _direction_from_ic(ic_series)
@@ -324,11 +344,19 @@ def evaluate_factor(
     # factor selection and weighting.
     rank_ic_ir = float(oriented_ic.mean() / ic_std) if ic_std > 0 else 0.0
 
+    ic_win_rate = float((oriented_ic > 0).mean())
+
+    # CPU evaluator has no Barra tensor context, so it cannot honestly compute
+    # neutralized ICIR. Keep the neutralized objective at 0.0 instead of copying
+    # raw ICIR; otherwise NSGA-II would treat an unevaluated robustness metric
+    # as if it had passed dynamic Barra stripping.
+    neutralized_icir = 0.0
+
     return FactorScore(
         mean_rank_ic=mean_ic,
         abs_rank_ic=abs(mean_ic),
         rank_ic_ir=rank_ic_ir,
-        ic_win_rate=float((oriented_ic > 0).mean()),
+        ic_win_rate=ic_win_rate,
         ndcg_at_k=ndcg_at_k(
             oriented_factor,
             label_eval,
@@ -339,6 +367,11 @@ def evaluate_factor(
         direction=direction,
         n_ic_obs=int(len(ic_series)),
         coverage=_coverage(factor_eval, label_eval, tradeable_eval),
+        neutralized_icir=neutralized_icir,
+        neutralized_mean_rank_ic=0.0,
+        neutralized_abs_rank_ic=0.0,
+        neutralized_ic_win_rate=0.0,
+        neutralized_n_ic_obs=0,
     )
 
 
@@ -531,14 +564,14 @@ def factor_group_pnl(
     for pnl_type in ["pnl_long", "pnl_short", "pnl_longshort"]:
         pnl_series = result[pnl_type]
         assert isinstance(pnl_series, pd.Series)
+        pnl_name = pnl_type.split("_")[1]
         pnl_mean = pnl_series.mean()
         pnl_std = pnl_series.std()
         result[f"{pnl_type}_mean"] = float(pnl_mean) if np.isfinite(pnl_mean) else 0.0
         result[f"{pnl_type}_ann"] = float(result[f"{pnl_type}_mean"] * periods_per_year)
         result[f"{pnl_type}_cumsum"] = pnl_series.cumsum()
-        sharpe_key = f"{pnl_type.split('_')[1]}_sharpe"
         raw_sharpe = float(pnl_mean / pnl_std * np.sqrt(periods_per_year)) if pnl_std > 0 else 0.0
-        result[f"{pnl_type.split('_')[1]}_raw_sharpe"] = raw_sharpe
+        result[f"{pnl_name}_raw_sharpe"] = raw_sharpe
 
         if pnl_type == "pnl_longshort":
             # Long-short is already market-relative by construction.
@@ -551,11 +584,14 @@ def factor_group_pnl(
         result[f"{pnl_type}_excess_mean"] = float(excess_mean) if np.isfinite(excess_mean) else 0.0
         result[f"{pnl_type}_excess_ann"] = float(result[f"{pnl_type}_excess_mean"] * periods_per_year)
         result[f"{pnl_type}_excess_cumsum"] = excess_series.cumsum()
-        result[sharpe_key] = (
+        result[f"{pnl_name}_excess_sharpe"] = (
             float(excess_mean / excess_std * np.sqrt(periods_per_year))
             if excess_std > 0
             else 0.0
         )
+        # 全行业搜索时，组合本身就是目标投资域，long/short Sharpe 使用组合
+        # 自身收益序列。相对等权基准的超额收益 Sharpe 只保留为诊断字段。
+        result[f"{pnl_name}_sharpe"] = raw_sharpe
 
         cumulative_pnl = result[f"{pnl_type}_cumsum"]
         assert isinstance(cumulative_pnl, pd.Series)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -89,14 +89,9 @@ def field_to_pivot(long_df: pd.DataFrame, field: str, dtype: str = "float32") ->
 
 
 def _safe_log(pivot: pd.DataFrame, dtype: str = "float32") -> pd.DataFrame:
-    """Natural log with non-positive values converted to NaN.
+    """Signed log1p transform that keeps negative fundamentals finite."""
 
-    Fundamental indicators can be negative in real data. Taking log of negative
-    profit/cash-flow values is not meaningful, so we explicitly mark them missing
-    instead of silently clipping.
-    """
-
-    logged = dot_log(pivot.where(pivot > 0))
+    logged = dot_log(pivot)
     logged.index.name = pivot.index.name
     logged.columns.name = pivot.columns.name
     return logged.astype(dtype)
@@ -113,11 +108,14 @@ def build_transform_cache(
     dtype: str = "float32",
     show_progress: bool = False,
     build_log_cache: bool = False,
+    extra_current_fields: Iterable[str] | None = None,
 ) -> TransformCache:
     """Build current field matrices used by later factor evaluation.
 
     Only fields present in `field_rules` are cached as candidate inputs. Columns
     such as label, tradeable mask and industry are handled separately.
+    `extra_current_fields` is for neutralization controls, such as a Barra size
+    exposure, that should be cached but not searched as candidate factors.
     """
 
     validate_long_format(long_df, require_time_component=True, strict=True)
@@ -140,6 +138,13 @@ def build_transform_cache(
 
         if build_log_cache and rule.allow_log:
             current[(field, True)] = _safe_log(raw, dtype=dtype)
+
+    for field in extra_current_fields or []:
+        if field in field_rules or (field, False) in current:
+            continue
+        if field not in long_df.columns:
+            raise KeyError(f"extra current field {field!r} is missing from input data")
+        current[(field, False)] = field_to_pivot(long_df, field, dtype=dtype)
 
     label = field_to_pivot(long_df, label_col, dtype=dtype)
     tradeable = field_to_pivot(long_df, tradeable_col, dtype=dtype)

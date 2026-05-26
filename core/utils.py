@@ -161,9 +161,10 @@ def pivot_to_long(pivot_df: pd.DataFrame, factor_name: str = "factor") -> pd.Dat
 
 
 def dot_log(df: pd.DataFrame, eps: float = 0) -> pd.DataFrame:
-    """Element-wise log; callers should mask non-positive values when needed."""
+    """Element-wise signed log1p transform: sign(x) * log(1 + abs(x))."""
 
-    return np.log(df + eps)
+    del eps
+    return np.sign(df) * np.log1p(np.abs(df))
 
 
 def dot_div(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -37,8 +38,11 @@ RESULT_DIR = ROOT / "results"
 
 def main() -> None:
     field_rules = load_field_rules(META_PATH)
+    metadata = json.loads(META_PATH.read_text(encoding="utf-8"))
+    size_field = str(metadata.get("size_field", "barra_size"))
+    barra_style_fields = tuple(metadata.get("barra_style_fields", ()))
     panel = load_panel(DATA_PATH)
-    cache = build_transform_cache(panel, field_rules)
+    cache = build_transform_cache(panel, field_rules, extra_current_fields=[size_field, *barra_style_fields])
     usable_dates = cache.label.index[:-20]
     windows = get_rolling_windows(
         usable_dates,
@@ -57,6 +61,8 @@ def main() -> None:
         crossover_prob=0.85,
         mutation_prob=0.25,
         random_seed=20260428,
+        size_field=size_field,
+        industry_scope="all",
     )
 
     result = run_ga_search(
@@ -81,6 +87,8 @@ def main() -> None:
         ndcg_top_fraction=config.ndcg_top_fraction,
         label_horizon=20,
         rebalance_freq=20,
+        size_field=config.size_field,
+        industry_scope=config.industry_scope,
     )
 
     paths = export_search_result(result, RESULT_DIR, prefix="mock_ga")

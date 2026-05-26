@@ -17,6 +17,19 @@ N_DAYS = 600
 START_DATE = "2023-01-03"
 RANDOM_SEED = 20260428
 
+BARRA_STYLE_FIELDS = [
+    "barra_size",
+    "barra_beta",
+    "barra_momentum",
+    "barra_residual_volatility",
+    "barra_non_linear_size",
+    "barra_book_to_price",
+    "barra_liquidity",
+    "barra_earnings_yield",
+    "barra_growth",
+    "barra_leverage",
+]
+
 
 FIELD_RULES = {
     # close is only used as x in the report, and only after time-series transforms.
@@ -28,7 +41,7 @@ FIELD_RULES = {
         "allow_lag": False,
         "allow_diff": False,
         "allow_pct": True,
-        "allow_std": True,
+        "allow_std": False,
     },
     "market_cap": {
         "can_y": False,
@@ -39,7 +52,7 @@ FIELD_RULES = {
         "allow_lag": False,
         "allow_diff": True,
         "allow_pct": True,
-        "allow_std": True,
+        "allow_std": False,
     },
     "enterprise_value": {
         "can_y": False,
@@ -59,7 +72,7 @@ FIELD_RULES = {
         "allow_lag": True,
         "allow_diff": True,
         "allow_pct": False,
-        "allow_std": True,
+        "allow_std": False,
     },
     "rating_score_90d": {
         "can_y": True,
@@ -69,7 +82,7 @@ FIELD_RULES = {
         "allow_lag": True,
         "allow_diff": True,
         "allow_pct": False,
-        "allow_std": True,
+        "allow_std": False,
     },
     "rating_score_180d": {
         "can_y": True,
@@ -79,7 +92,7 @@ FIELD_RULES = {
         "allow_lag": True,
         "allow_diff": True,
         "allow_pct": False,
-        "allow_std": True,
+        "allow_std": False,
     },
 }
 
@@ -112,6 +125,164 @@ for field in FUNDAMENTAL_FIELDS:
         "allow_std": False,
     }
 
+FIELD_SEMANTICS = {
+    "close": {
+        "family": "price",
+        "unit_type": "price",
+        "statement": "market",
+        "period_type": "daily",
+        "direction": 1,
+        "add_group": "price",
+    },
+    "market_cap": {
+        "family": "size",
+        "unit_type": "currency",
+        "statement": "market",
+        "period_type": "daily",
+        "direction": -1,
+        "add_group": "market_value",
+    },
+    "enterprise_value": {
+        "family": "size",
+        "unit_type": "currency",
+        "statement": "market",
+        "period_type": "daily",
+        "direction": -1,
+        "add_group": "market_value",
+    },
+    "rating_score_30d": {
+        "family": "analyst",
+        "unit_type": "score",
+        "statement": "analyst",
+        "period_type": "30d",
+        "direction": 1,
+        "add_group": "score",
+    },
+    "rating_score_90d": {
+        "family": "analyst",
+        "unit_type": "score",
+        "statement": "analyst",
+        "period_type": "90d",
+        "direction": 1,
+        "add_group": "score",
+    },
+    "rating_score_180d": {
+        "family": "analyst",
+        "unit_type": "score",
+        "statement": "analyst",
+        "period_type": "180d",
+        "direction": 1,
+        "add_group": "score",
+    },
+    "book_equity": {
+        "family": "size",
+        "unit_type": "currency",
+        "statement": "balance_sheet",
+        "period_type": "unknown",
+        "direction": 1,
+        "add_group": "equity",
+    },
+    "total_assets": {
+        "family": "size",
+        "unit_type": "currency",
+        "statement": "balance_sheet",
+        "period_type": "unknown",
+        "direction": 1,
+        "add_group": "asset",
+    },
+    "revenue_mrq": {
+        "family": "profitability",
+        "unit_type": "currency",
+        "statement": "income",
+        "period_type": "mrq",
+        "direction": 1,
+        "add_group": "revenue",
+    },
+    "revenue_ttm": {
+        "family": "profitability",
+        "unit_type": "currency",
+        "statement": "income",
+        "period_type": "ttm",
+        "direction": 1,
+        "add_group": "revenue",
+    },
+    "operating_profit_mrq": {
+        "family": "profitability",
+        "unit_type": "currency",
+        "statement": "income",
+        "period_type": "mrq",
+        "direction": 1,
+        "add_group": "profit",
+    },
+    "operating_profit_ttm": {
+        "family": "profitability",
+        "unit_type": "currency",
+        "statement": "income",
+        "period_type": "ttm",
+        "direction": 1,
+        "add_group": "profit",
+    },
+    "net_profit_mrq": {
+        "family": "profitability",
+        "unit_type": "currency",
+        "statement": "income",
+        "period_type": "mrq",
+        "direction": 1,
+        "add_group": "profit",
+    },
+    "net_profit_ttm": {
+        "family": "profitability",
+        "unit_type": "currency",
+        "statement": "income",
+        "period_type": "ttm",
+        "direction": 1,
+        "add_group": "profit",
+    },
+    "rd_expense_ttm": {
+        "family": "quality",
+        "unit_type": "currency",
+        "statement": "income",
+        "period_type": "ttm",
+        "direction": -1,
+        "add_group": "expense",
+    },
+    "capex_ttm": {
+        "family": "quality",
+        "unit_type": "currency",
+        "statement": "cashflow",
+        "period_type": "ttm",
+        "direction": -1,
+        "add_group": "expense",
+    },
+    "free_cash_flow_ttm": {
+        "family": "cashflow",
+        "unit_type": "currency",
+        "statement": "cashflow",
+        "period_type": "ttm",
+        "direction": 1,
+        "add_group": "cashflow",
+    },
+    "forecast_revenue_ry": {
+        "family": "growth",
+        "unit_type": "currency",
+        "statement": "analyst",
+        "period_type": "ry",
+        "direction": 1,
+        "add_group": "revenue",
+    },
+    "forecast_net_profit_ry": {
+        "family": "growth",
+        "unit_type": "currency",
+        "statement": "analyst",
+        "period_type": "ry",
+        "direction": 1,
+        "add_group": "profit",
+    },
+}
+
+for field, semantics in FIELD_SEMANTICS.items():
+    FIELD_RULES[field].update(semantics)
+
 
 def _make_contracts() -> tuple[list[str], pd.Series]:
     industries = ["electronics", "computer", "communication", "media"]
@@ -143,6 +314,17 @@ def _rolling_ttm(values: np.ndarray) -> np.ndarray:
 
 def _winsor_positive(values: np.ndarray, floor: float = 1e-4) -> np.ndarray:
     return np.maximum(values, floor)
+
+
+def _cs_zscore_fill0(values: pd.DataFrame) -> pd.DataFrame:
+    """Cross-sectional z-score for mock Barra exposures, with NaNs filled 0."""
+
+    centered = values.sub(values.mean(axis=1), axis=0)
+    scaled = centered.div(values.std(axis=1).replace(0.0, np.nan), axis=0)
+    out = scaled.replace([np.inf, -np.inf], np.nan).fillna(0.0).astype("float32")
+    out.index.name = "Datetime"
+    out.columns.name = "Contract"
+    return out
 
 
 def make_mock_tmt_data() -> pd.DataFrame:
@@ -261,9 +443,30 @@ def make_mock_tmt_data() -> pd.DataFrame:
         frame.index.name = "Datetime"
         frame.columns.name = "Contract"
 
+    # Mock Barra style exposures. They are intended as neutralization controls,
+    # not gene fields, so metadata lists them separately from FIELD_RULES.
+    daily_ret = close.pct_change().fillna(0.0)
+    barra_size = _cs_zscore_fill0(market_cap)
+    beta_frame = pd.DataFrame(
+        beta[None, :] + daily_ret.rolling(60, min_periods=10).corr(pd.Series(market_ret, index=dates)).fillna(0.0).to_numpy() * 0.10,
+        index=dates,
+        columns=contracts,
+    )
+    barra_beta = _cs_zscore_fill0(beta_frame)
+    barra_momentum = _cs_zscore_fill0(close.pct_change(120).sub(close.pct_change(20), fill_value=0.0))
+    barra_residual_volatility = _cs_zscore_fill0(daily_ret.rolling(60, min_periods=20).std())
+    barra_non_linear_size = _cs_zscore_fill0(barra_size.pow(3))
+    barra_book_to_price = _cs_zscore_fill0(np.log(quarterly_daily["book_equity"].clip(lower=1e-4)) - market_cap)
+    barra_liquidity = _cs_zscore_fill0(np.log1p(turnover.rolling(60, min_periods=10).mean() * amount.rolling(60, min_periods=10).mean()))
+    barra_earnings_yield = _cs_zscore_fill0(quarterly_daily["net_profit_ttm"].div(market_cap_raw.replace(0.0, np.nan)))
+    barra_growth = _cs_zscore_fill0(forecast_revenue_ry.div(quarterly_daily["revenue_ttm"].replace(0.0, np.nan)).sub(1.0))
+    barra_leverage = _cs_zscore_fill0(quarterly_daily["liabilities"].div(quarterly_daily["total_assets"].replace(0.0, np.nan)))
+
     tradeable = pd.DataFrame((rng.random((n_dates, N_CONTRACTS)) > 0.025).astype("int8"), index=dates, columns=contracts)
     tradeable.index.name = "Datetime"
     tradeable.columns.name = "Contract"
+    label_1d = close.shift(-1).div(close).sub(1.0)
+    label_5d = close.shift(-5).div(close).sub(1.0)
     label_20d = close.shift(-20).div(close).sub(1.0)
 
     frames = {
@@ -292,7 +495,19 @@ def make_mock_tmt_data() -> pd.DataFrame:
         "rating_score_30d": rating_30d,
         "rating_score_90d": rating_90d,
         "rating_score_180d": rating_180d,
+        "barra_size": barra_size,
+        "barra_beta": barra_beta,
+        "barra_momentum": barra_momentum,
+        "barra_residual_volatility": barra_residual_volatility,
+        "barra_non_linear_size": barra_non_linear_size,
+        "barra_book_to_price": barra_book_to_price,
+        "barra_liquidity": barra_liquidity,
+        "barra_earnings_yield": barra_earnings_yield,
+        "barra_growth": barra_growth,
+        "barra_leverage": barra_leverage,
         "is_tradeable": tradeable,
+        "label_1d": label_1d,
+        "label_5d": label_5d,
         "label_20d": label_20d,
     }
 
@@ -339,12 +554,18 @@ def save_outputs(data: pd.DataFrame) -> None:
             "Mock daily TMT stock panel for local debugging only.",
             "Datetime uses 15:00:00 to satisfy alpha_gen pivot validation.",
             "market_cap is stored as log market cap and should not be logged again inside alpha_gen.",
+            "barra_size is the default size neutralization field; market_cap remains a legacy fallback.",
+            "Barra style fields are cross-sectionally z-scored controls and are not searchable gene fields.",
             "Fundamental fields are quarterly values with a 20-business-day disclosure lag, then forward-filled to daily.",
-            "label_20d is future 20-trading-day return and should be used only as the training label.",
+            "label_1d, label_5d, and label_20d are future returns; pick one label column explicitly when building the cache.",
+            "resi_pair and multi_resi require additive controls with matching unit_type/add_group/accounting transform semantics.",
         ],
         "numeric_fields": [c for c in data.columns if c != "industry_code"],
         "categorical_fields": ["industry_code"],
         "field_rules": FIELD_RULES,
+        "size_field": "barra_size",
+        "barra_style_fields": BARRA_STYLE_FIELDS,
+        "extra_current_fields": BARRA_STYLE_FIELDS,
     }
     OUT_META.write_text(json.dumps(metadata, indent=2, ensure_ascii=True), encoding="utf-8")
 
