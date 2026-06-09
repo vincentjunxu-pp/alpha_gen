@@ -27,9 +27,9 @@ from alpha_gen.scripts.data_builders.make_metadata_from_columns import metadata_
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REAL_DATA = ROOT / "data" / "panels" / "real_tmt_daily.parquet"
-DEFAULT_REAL_META = ROOT / "data" / "metadata" / "real_metadata.json"
+DEFAULT_REAL_META = ROOT / "data" / "metadata" / "production" / "real_metadata.json"
 DEFAULT_MOCK_DATA = ROOT / "data" / "panels" / "mock_tmt_daily.parquet"
-DEFAULT_MOCK_META = ROOT / "data" / "metadata" / "mock_tmt_metadata.json"
+DEFAULT_MOCK_META = ROOT / "data" / "metadata" / "fixtures" / "mock_tmt_metadata.json"
 RESULT_DIR = ROOT / "artifacts" / "results"
 
 

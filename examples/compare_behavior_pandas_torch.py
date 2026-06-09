@@ -478,7 +478,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data", required=True, help="Long-format parquet panel.")
     parser.add_argument(
         "--metadata",
-        default=str(root / "data" / "metadata" / "real_behavior_metadata.json"),
+        default=str(
+            root / "data" / "metadata" / "production" / "real_behavior_metadata.json"
+        ),
         help="Metadata JSON containing field_rules and behavior_field_rules.",
     )
     parser.add_argument("--label-col", default="label_20d")

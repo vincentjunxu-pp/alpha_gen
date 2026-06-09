@@ -23,7 +23,7 @@ from alpha_gen.core.utils import dot_log, get_rolling_windows, long_to_pivot, va
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "panels" / "mock_tmt_daily.parquet"
-META_PATH = ROOT / "data" / "metadata" / "mock_tmt_metadata.json"
+META_PATH = ROOT / "data" / "metadata" / "fixtures" / "mock_tmt_metadata.json"
 
 
 def assert_true(condition: bool, message: str) -> None:

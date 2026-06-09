@@ -44,6 +44,8 @@ CONDITION_OP_CHOICES = (
 )
 
 DIRECTION_POLICIES = ("fixed", "train_ic", "regime_switch")
+BEHAVIOR_DATA_FAMILIES = ("fundamental", "price_volume", "moneyflow", "orderbook", "control")
+SPECIAL_ALLOWED_SLOTS = ("state_signal", "control", "price_volume_control")
 
 
 @dataclass(frozen=True)
@@ -52,12 +54,6 @@ class BehaviorFieldRule:
 
     data_family: str
     behavior_roles: tuple[str, ...]
-    sub_family: str = "unknown"
-    sub_type: str = "unknown"
-    unit_type: str = "unknown"
-    window: str = "unknown"
-    session: str = "full"
-    investor_type: str = "none"
     direction: int = 1
     allowed_slots: tuple[str, ...] = ()
     allowed_unary_ops: tuple[str, ...] = ("current", "rank_pct", "zscore")
@@ -93,12 +89,6 @@ class BehaviorFieldRule:
         return cls(
             data_family=str(raw.get("data_family", raw.get("family", "other"))),
             behavior_roles=roles,
-            sub_family=str(raw.get("sub_family", raw.get("family", "unknown"))),
-            sub_type=str(raw.get("sub_type", raw.get("sub_family", "unknown"))),
-            unit_type=str(raw.get("unit_type", "unknown")),
-            window=str(raw.get("window", raw.get("period_type", "unknown"))),
-            session=str(raw.get("session", "full")),
-            investor_type=str(raw.get("investor_type", "none")),
             direction=direction,
             allowed_slots=slots,
             allowed_unary_ops=unary_ops,
@@ -379,7 +369,11 @@ def load_behavior_field_rules(metadata_path: str | Path) -> dict[str, BehaviorFi
     raw_rules = metadata.get("behavior_field_rules")
     if raw_rules is None:
         raw_rules = metadata.get("field_rules", {})
-    return {field: BehaviorFieldRule.from_dict(rule) for field, rule in raw_rules.items()}
+    rules = {field: BehaviorFieldRule.from_dict(rule) for field, rule in raw_rules.items()}
+    errors = validate_behavior_field_rules(rules)
+    if errors:
+        raise ValueError("invalid behavior field metadata: " + "; ".join(errors[:20]))
+    return rules
 
 
 def mode_names() -> tuple[str, ...]:
@@ -434,6 +428,72 @@ def condition_fields_for_mode(
     return output
 
 
+def validate_mode_registry() -> list[str]:
+    """Validate static mode definitions before field metadata is applied."""
+
+    errors: list[str] = []
+    for mode, spec in MODE_REGISTRY.items():
+        if spec.name != mode:
+            errors.append(f"mode key {mode!r} does not match spec.name {spec.name!r}")
+        if not spec.allowed_combiners:
+            errors.append(f"mode {mode!r} has no allowed combiners")
+        elif spec.default_combiner not in spec.allowed_combiners:
+            errors.append(f"mode {mode!r} default combiner is not allowed")
+        unknown_combiners = sorted(set(spec.allowed_combiners) - set(COMBINER_CHOICES))
+        if unknown_combiners:
+            errors.append(f"mode {mode!r} has unknown combiners {unknown_combiners}")
+        if spec.direction not in {-1, 1}:
+            errors.append(f"mode {mode!r} direction must be -1 or 1")
+        if spec.direction_policy not in DIRECTION_POLICIES:
+            errors.append(f"mode {mode!r} has unknown direction policy {spec.direction_policy!r}")
+        if spec.max_conditions < 0:
+            errors.append(f"mode {mode!r} max_conditions must be non-negative")
+        for slot_name, slot_spec in spec.slots.items():
+            if slot_spec.role != slot_name:
+                errors.append(
+                    f"mode {mode!r} slot {slot_name!r} has mismatched role {slot_spec.role!r}"
+                )
+            unknown_families = sorted(set(slot_spec.data_families) - set(BEHAVIOR_DATA_FAMILIES))
+            if unknown_families:
+                errors.append(
+                    f"mode {mode!r} slot {slot_name!r} has unknown data families {unknown_families}"
+                )
+    return errors
+
+
+def validate_behavior_field_rules(
+    field_rules: Mapping[str, BehaviorFieldRule],
+) -> list[str]:
+    """Validate metadata properties used by behavior mode sampling."""
+
+    errors = validate_mode_registry()
+    known_slots = {
+        slot_name
+        for mode_spec in MODE_REGISTRY.values()
+        for slot_name in mode_spec.slots
+    } | set(SPECIAL_ALLOWED_SLOTS)
+
+    for field, rule in field_rules.items():
+        if rule.data_family not in BEHAVIOR_DATA_FAMILIES:
+            errors.append(f"field {field!r} has unknown data_family {rule.data_family!r}")
+        if not rule.behavior_roles:
+            errors.append(f"field {field!r} has no behavior_roles")
+        allowed_directions = {-1, 0, 1} if rule.data_family == "control" else {-1, 1}
+        if rule.direction not in allowed_directions:
+            errors.append(
+                f"field {field!r} direction must be one of {sorted(allowed_directions)}"
+            )
+        if not rule.allowed_unary_ops:
+            errors.append(f"field {field!r} has no allowed_unary_ops")
+        unknown_unary = sorted(set(rule.allowed_unary_ops) - set(UNARY_OP_CHOICES))
+        if unknown_unary:
+            errors.append(f"field {field!r} has unknown unary ops {unknown_unary}")
+        unknown_slots = sorted(set(rule.allowed_slots) - known_slots)
+        if unknown_slots:
+            errors.append(f"field {field!r} has unknown allowed_slots {unknown_slots}")
+    return errors
+
+
 def validate_gene(gene: BehaviorGene, field_rules: Mapping[str, BehaviorFieldRule]) -> list[str]:
     """Return all validation errors for a behavior gene."""
 
@@ -459,6 +519,11 @@ def validate_gene(gene: BehaviorGene, field_rules: Mapping[str, BehaviorFieldRul
     unknown_slots = sorted(set(gene.slots) - set(mode_spec.slots))
     if unknown_slots:
         errors.append(f"gene has slots not defined by mode {gene.mode!r}: {unknown_slots}")
+
+    slot_fields = [slot.field for slot in gene.slots.values()]
+    if len(slot_fields) != len(set(slot_fields)):
+        duplicates = sorted({field for field in slot_fields if slot_fields.count(field) > 1})
+        errors.append(f"gene reuses fields across slots: {duplicates}")
 
     for slot_name, slot_spec in mode_spec.slots.items():
         slot_gene = gene.slots.get(slot_name)

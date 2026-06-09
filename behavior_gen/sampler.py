@@ -99,8 +99,12 @@ def _sample_slot(
     slot_name: str,
     slot_spec: SlotSpec,
     rng: np.random.Generator,
+    *,
+    excluded_fields: set[str] | None = None,
 ) -> SlotGene:
     candidates = _slot_candidates(field_rules, slot_name, slot_spec)
+    if excluded_fields:
+        candidates = [field for field in candidates if field not in excluded_fields]
     if not candidates:
         raise RuntimeError(f"slot {slot_name!r} has no legal field candidates")
     field = _choice(rng, candidates)
@@ -128,11 +132,24 @@ def _sample_slots(
     config: BehaviorSamplerConfig,
 ) -> dict[str, SlotGene]:
     slots: dict[str, SlotGene] = {}
+    used_fields: set[str] = set()
     for slot_name, slot_spec in mode_spec.slots.items():
         if slot_spec.required or rng.random() < config.optional_slot_probability:
-            candidates = _slot_candidates(field_rules, slot_name, slot_spec)
+            candidates = [
+                field
+                for field in _slot_candidates(field_rules, slot_name, slot_spec)
+                if field not in used_fields
+            ]
             if candidates:
-                slots[slot_name] = _sample_slot(field_rules, slot_name, slot_spec, rng)
+                slot = _sample_slot(
+                    field_rules,
+                    slot_name,
+                    slot_spec,
+                    rng,
+                    excluded_fields=used_fields,
+                )
+                slots[slot_name] = slot
+                used_fields.add(slot.field)
     return slots
 
 
@@ -199,13 +216,29 @@ def _repair_slot(
     slot_spec: SlotSpec,
     field_rules: Mapping[str, BehaviorFieldRule],
     rng: np.random.Generator,
+    *,
+    excluded_fields: set[str] | None = None,
 ) -> SlotGene | None:
-    if slot is not None and _slot_gene_is_valid(slot, slot_name, slot_spec, field_rules):
+    if (
+        slot is not None
+        and (not excluded_fields or slot.field not in excluded_fields)
+        and _slot_gene_is_valid(slot, slot_name, slot_spec, field_rules)
+    ):
         return slot
-    candidates = _slot_candidates(field_rules, slot_name, slot_spec)
+    candidates = [
+        field
+        for field in _slot_candidates(field_rules, slot_name, slot_spec)
+        if not excluded_fields or field not in excluded_fields
+    ]
     if not candidates:
         return None
-    return _sample_slot(field_rules, slot_name, slot_spec, rng)
+    return _sample_slot(
+        field_rules,
+        slot_name,
+        slot_spec,
+        rng,
+        excluded_fields=excluded_fields,
+    )
 
 
 def _condition_is_valid(
@@ -264,11 +297,20 @@ def repair_gene(
     combiner = gene.combiner if gene.combiner in mode_spec.allowed_combiners else mode_spec.default_combiner
 
     slots: dict[str, SlotGene] = {}
+    used_fields: set[str] = set()
     for slot_name, slot_spec in mode_spec.slots.items():
         existing = gene.slots.get(slot_name)
-        repaired = _repair_slot(existing, slot_name, slot_spec, field_rules, rng)
+        repaired = _repair_slot(
+            existing,
+            slot_name,
+            slot_spec,
+            field_rules,
+            rng,
+            excluded_fields=used_fields,
+        )
         if repaired is not None and (slot_spec.required or existing is not None or rng.random() < config.optional_slot_probability):
             slots[slot_name] = repaired
+            used_fields.add(repaired.field)
 
     conditions = _repair_conditions(gene.conditions, mode_spec, field_rules, rng, config)
     direction_policy = gene.direction_policy if gene.direction_policy in config.direction_policies else "fixed"
@@ -290,14 +332,25 @@ def repair_gene(
 
     # If optional retained choices still caused an edge case, sample fresh in the
     # selected mode so repair remains total for GA operations.
+    fresh_slots: dict[str, SlotGene] = {}
+    used_fields = set()
+    for slot_name, slot_spec in mode_spec.slots.items():
+        if not slot_spec.required:
+            continue
+        slot = _sample_slot(
+            field_rules,
+            slot_name,
+            slot_spec,
+            rng,
+            excluded_fields=used_fields,
+        )
+        fresh_slots[slot_name] = slot
+        used_fields.add(slot.field)
+
     fresh = BehaviorGene(
         mode=mode,
         combiner=mode_spec.default_combiner,
-        slots={
-            slot_name: _sample_slot(field_rules, slot_name, slot_spec, rng)
-            for slot_name, slot_spec in mode_spec.slots.items()
-            if slot_spec.required
-        },
+        slots=fresh_slots,
         conditions=(),
         direction_policy="fixed",
     )
@@ -343,11 +396,33 @@ def mutate_one_parameter(
             slot_spec = mode_spec.slots[slot_name]
             old_slot = gene.slots[slot_name]
             if parameter == "slot_field":
-                new_slot = _sample_slot(field_rules, slot_name, slot_spec, rng)
+                excluded_fields = {
+                    slot.field
+                    for name, slot in gene.slots.items()
+                    if name != slot_name
+                }
+                new_slot = _sample_slot(
+                    field_rules,
+                    slot_name,
+                    slot_spec,
+                    rng,
+                    excluded_fields=excluded_fields,
+                )
             else:
                 rule = field_rules.get(old_slot.field)
                 if rule is None:
-                    new_slot = _sample_slot(field_rules, slot_name, slot_spec, rng)
+                    excluded_fields = {
+                        slot.field
+                        for name, slot in gene.slots.items()
+                        if name != slot_name
+                    }
+                    new_slot = _sample_slot(
+                        field_rules,
+                        slot_name,
+                        slot_spec,
+                        rng,
+                        excluded_fields=excluded_fields,
+                    )
                 else:
                     new_slot = replace(old_slot, unary_op=_choice(rng, _allowed_unary_ops(rule)))
             slots = dict(gene.slots)

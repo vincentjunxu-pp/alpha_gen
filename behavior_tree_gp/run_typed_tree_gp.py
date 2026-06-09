@@ -3,7 +3,7 @@
 Usage (from E:/实习):
   D:/Anaconda/envs/pytorch/python.exe -m alpha_gen.behavior_tree_gp.run_typed_tree_gp \
     --data-path alpha_gen/data/panels/mock_behavior_daily.parquet \
-    --metadata-path alpha_gen/data/metadata/mock_behavior_metadata.json \
+    --metadata-path alpha_gen/data/metadata/fixtures/mock_behavior_metadata.json \
     --population-size 8 --generations 1
 """
 
@@ -38,7 +38,7 @@ from .typed_sampler import TypedTreeSamplerConfig
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA = ROOT / "data" / "panels" / "mock_behavior_daily.parquet"
-DEFAULT_META = ROOT / "data" / "metadata" / "mock_behavior_metadata.json"
+DEFAULT_META = ROOT / "data" / "metadata" / "fixtures" / "mock_behavior_metadata.json"
 DEFAULT_RESULT = ROOT / "artifacts" / "results" / "typed_tree_gp"
 
 

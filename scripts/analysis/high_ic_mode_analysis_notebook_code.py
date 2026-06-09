@@ -17,7 +17,7 @@ sns.set_theme(style="whitegrid")
 plt.rcParams["axes.unicode_minus"] = False
 
 RESULT_PATH = r"E:\实习\alpha_gen\artifacts\results\your_result_table.csv"
-META_PATH = r"E:\实习\alpha_gen\data\metadata\real_behavior_metadata.json"
+META_PATH = r"E:\实习\alpha_gen\data\metadata\production\real_behavior_metadata.json"
 
 
 # ======================

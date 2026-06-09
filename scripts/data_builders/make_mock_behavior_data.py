@@ -9,7 +9,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT_PARQUET = ROOT / "data" / "panels" / "mock_behavior_daily.parquet"
-OUT_META = ROOT / "data" / "metadata" / "mock_behavior_metadata.json"
+OUT_META = ROOT / "data" / "metadata" / "fixtures" / "mock_behavior_metadata.json"
 
 N_CONTRACTS = 120
 N_DAYS = 620

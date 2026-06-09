@@ -28,7 +28,7 @@ from alpha_gen.core.utils import get_rolling_windows
 # %%
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "panels" / "mock_behavior_daily.parquet"
-META_PATH = ROOT / "data" / "metadata" / "mock_behavior_metadata.json"
+META_PATH = ROOT / "data" / "metadata" / "fixtures" / "mock_behavior_metadata.json"
 RESULT_DIR = ROOT / "artifacts" / "results"
 
 LABEL_COL = "label_20d"

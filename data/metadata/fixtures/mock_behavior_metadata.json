@@ -1,0 +1,3266 @@
+{
+  "dataset": "mock_behavior_daily.parquet",
+  "format": "parquet",
+  "compression": "zstd",
+  "index": [
+    "Datetime",
+    "Contract"
+  ],
+  "shape": [
+    74400,
+    100
+  ],
+  "n_dates": 620,
+  "n_contracts": 120,
+  "start": "2023-01-03 15:00:00",
+  "end": "2025-05-19 15:00:00",
+  "notes": [
+    "Mock daily behavior-finance panel for behavior_gen debugging.",
+    "Datetime uses 15:00:00 and Contract as a long-table MultiIndex.",
+    "Orderbook and moneyflow fields are already aggregated to daily frequency.",
+    "label_1d, label_5d, and label_20d are synthetic forward-return labels with planted behavior alpha.",
+    "field_rules are compatible with alpha_gen.core.load_field_rules; behavior_field_rules drive behavior_gen."
+  ],
+  "label_fields": [
+    "label_1d",
+    "label_5d",
+    "label_20d"
+  ],
+  "tradeable_field": "is_tradeable",
+  "industry_field": "industry_code",
+  "size_field": "barra_size",
+  "barra_style_fields": [
+    "barra_size",
+    "barra_beta",
+    "barra_momentum",
+    "barra_residual_volatility",
+    "barra_non_linear_size",
+    "barra_book_to_price",
+    "barra_liquidity",
+    "barra_earnings_yield",
+    "barra_growth",
+    "barra_leverage"
+  ],
+  "field_rules": {
+    "operating_revenue_growth_ratio_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "growth",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "gross_profit_growth_ratio_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "growth",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "operating_profit_growth_ratio_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "growth",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "net_profit_growth_ratio_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "growth",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "total_asset_growth_ratio_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "growth",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "rev_growth_accel": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "growth",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "net_profit_growth_accel": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "growth",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "balanced_growth_rank_mean": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "growth",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "net_operate_cash_flow_growth_ratio_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "ocf_growth_accel": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "ocf_vs_net_profit_growth_gap": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "gross_vs_revenue_growth_gap": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "operating_profit_vs_revenue_growth_gap": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "roe_leverage_adjusted": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "cashflow_debt_coverage": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "core_profit_quality": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "ep_ratio_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "book_to_market_ratio_ttm": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "value_composite_rank": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "fundamental",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "fundamental",
+      "allow_industry_relative": true
+    },
+    "ret_5d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "return",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "ret_20d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "return",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "ret_60d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "return",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "ret_120d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "return",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "skip_momentum_60_20": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "drawdown_20d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "return",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "max_ret_20d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "return",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "close_to_high_252d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "close_to_vwap_60d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "volatility_20d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "volatility_60d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "volume_crowding_5_20": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "amount_crowding_20_60": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "turnover_shock_20d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "price_volume_divergence_20_60": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "overbought_consensus": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "panic_oversold_score": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "crowded_momentum_risk": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "price_volume",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "price_volume",
+      "allow_industry_relative": true
+    },
+    "ob_spread_full_mean": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_spread_full_std": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_imbalance_5_full_mean": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_imbalance_5_open30_mean": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_imbalance_5_close30_mean": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_net_bid_change_5_open30_mean": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_net_bid_change_5_close30_mean": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_open_buy_intent": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_close_chase_pressure": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_liquidity_stress": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "ob_close_buying_vs_day": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "orderbook",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "orderbook",
+      "allow_industry_relative": true
+    },
+    "mf_net_amount_ratio": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_sm_net_ratio": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_large_net_ratio": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_mid_large_net_ratio": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_large_vs_small_net": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_active_imbalance": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_lg_s3": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_sm_s3": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_net_amount_ratio_5d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_large_net_ratio_20d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_sm_net_ratio_20d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_large_vs_small_net_20d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "mf_large_positive_days_20d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "flow_price_divergence_5d": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "institution_accumulation": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "retail_chase_risk": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "large_order_confirmed_momentum": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "moneyflow_crowding_risk": {
+      "can_y": true,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": true,
+      "allow_std": false,
+      "family": "moneyflow",
+      "unit_type": "ratio",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": -1,
+      "add_group": "moneyflow",
+      "allow_industry_relative": true
+    },
+    "market_cap": {
+      "can_y": false,
+      "can_x": true,
+      "allow_log": false,
+      "allow_current": true,
+      "allow_lag": false,
+      "allow_diff": true,
+      "allow_pct": false,
+      "allow_std": false,
+      "family": "control",
+      "unit_type": "score",
+      "statement": "behavior",
+      "period_type": "daily",
+      "direction": 0,
+      "add_group": "control",
+      "allow_industry_relative": true
+    }
+  },
+  "behavior_field_rules": {
+    "operating_revenue_growth_ratio_ttm": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "growth",
+        "support"
+      ],
+      "sub_family": "growth",
+      "unit_type": "growth",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "growth_anchor",
+        "profit_growth"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "gross_profit_growth_ratio_ttm": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "growth",
+        "support"
+      ],
+      "sub_family": "growth",
+      "unit_type": "growth",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "growth_anchor",
+        "profit_growth"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "operating_profit_growth_ratio_ttm": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "growth",
+        "support"
+      ],
+      "sub_family": "growth",
+      "unit_type": "growth",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "growth_anchor",
+        "profit_growth"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "net_profit_growth_ratio_ttm": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "growth",
+        "support"
+      ],
+      "sub_family": "growth",
+      "unit_type": "growth",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "growth_anchor",
+        "profit_growth"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "total_asset_growth_ratio_ttm": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "growth",
+        "support"
+      ],
+      "sub_family": "growth",
+      "unit_type": "growth",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "growth_anchor",
+        "profit_growth"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "rev_growth_accel": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "growth",
+        "support"
+      ],
+      "sub_family": "growth",
+      "unit_type": "growth",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "growth_anchor",
+        "profit_growth"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "net_profit_growth_accel": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "growth",
+        "support"
+      ],
+      "sub_family": "growth",
+      "unit_type": "growth",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "growth_anchor",
+        "profit_growth"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "balanced_growth_rank_mean": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "growth",
+        "support"
+      ],
+      "sub_family": "growth",
+      "unit_type": "growth",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "growth_anchor",
+        "profit_growth"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "net_operate_cash_flow_growth_ratio_ttm": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "quality",
+        "cashflow_quality",
+        "support"
+      ],
+      "sub_family": "quality",
+      "unit_type": "score",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "cashflow_quality",
+        "quality_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ocf_growth_accel": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "quality",
+        "cashflow_quality",
+        "support"
+      ],
+      "sub_family": "quality",
+      "unit_type": "score",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "cashflow_quality",
+        "quality_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ocf_vs_net_profit_growth_gap": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "quality",
+        "cashflow_quality",
+        "support"
+      ],
+      "sub_family": "quality",
+      "unit_type": "score",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "cashflow_quality",
+        "quality_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "gross_vs_revenue_growth_gap": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "quality",
+        "cashflow_quality",
+        "support"
+      ],
+      "sub_family": "quality",
+      "unit_type": "score",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "cashflow_quality",
+        "quality_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "operating_profit_vs_revenue_growth_gap": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "quality",
+        "cashflow_quality",
+        "support"
+      ],
+      "sub_family": "quality",
+      "unit_type": "score",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "cashflow_quality",
+        "quality_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "roe_leverage_adjusted": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "quality",
+        "cashflow_quality",
+        "support"
+      ],
+      "sub_family": "quality",
+      "unit_type": "score",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "cashflow_quality",
+        "quality_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "cashflow_debt_coverage": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "quality",
+        "cashflow_quality",
+        "support"
+      ],
+      "sub_family": "quality",
+      "unit_type": "score",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "cashflow_quality",
+        "quality_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "core_profit_quality": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "anchor",
+        "quality",
+        "cashflow_quality",
+        "support"
+      ],
+      "sub_family": "quality",
+      "unit_type": "score",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "cashflow_quality",
+        "quality_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ep_ratio_ttm": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "valuation",
+        "support",
+        "anchor"
+      ],
+      "sub_family": "valuation",
+      "unit_type": "ratio",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "valuation_support"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "book_to_market_ratio_ttm": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "valuation",
+        "support",
+        "anchor"
+      ],
+      "sub_family": "valuation",
+      "unit_type": "ratio",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "valuation_support"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "value_composite_rank": {
+      "data_family": "fundamental",
+      "behavior_roles": [
+        "valuation",
+        "support",
+        "anchor"
+      ],
+      "sub_family": "valuation",
+      "unit_type": "ratio",
+      "window": "ttm",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "fund_anchor",
+        "fund_support",
+        "valuation_support"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ret_5d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "reaction",
+        "momentum"
+      ],
+      "sub_family": "momentum",
+      "unit_type": "return",
+      "window": "5d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ret_20d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "reaction",
+        "momentum"
+      ],
+      "sub_family": "momentum",
+      "unit_type": "return",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ret_60d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "reaction",
+        "momentum"
+      ],
+      "sub_family": "momentum",
+      "unit_type": "return",
+      "window": "60d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ret_120d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "reaction",
+        "momentum"
+      ],
+      "sub_family": "momentum",
+      "unit_type": "return",
+      "window": "120d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "skip_momentum_60_20": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "momentum",
+        "anchor_momentum"
+      ],
+      "sub_family": "anchor_momentum",
+      "unit_type": "score",
+      "window": "60d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "drawdown_20d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "panic",
+        "drawdown"
+      ],
+      "sub_family": "drawdown",
+      "unit_type": "return",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal",
+        "drawdown"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "max_ret_20d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "attention",
+        "lottery"
+      ],
+      "sub_family": "lottery",
+      "unit_type": "return",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "close_to_high_252d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "anchor",
+        "price_anchor"
+      ],
+      "sub_family": "price_anchor",
+      "unit_type": "score",
+      "window": "252d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal",
+        "price_anchor",
+        "cost_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "close_to_vwap_60d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "anchor",
+        "cost_anchor"
+      ],
+      "sub_family": "cost_anchor",
+      "unit_type": "score",
+      "window": "60d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal",
+        "price_anchor",
+        "cost_anchor"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "volatility_20d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "volatility",
+        "uncertainty"
+      ],
+      "sub_family": "uncertainty",
+      "unit_type": "score",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "volatility_60d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "volatility",
+        "uncertainty"
+      ],
+      "sub_family": "uncertainty",
+      "unit_type": "score",
+      "window": "60d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "volume_crowding_5_20": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "attention",
+        "crowding"
+      ],
+      "sub_family": "crowding",
+      "unit_type": "score",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "amount_crowding_20_60": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "attention",
+        "crowding"
+      ],
+      "sub_family": "crowding",
+      "unit_type": "score",
+      "window": "60d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "turnover_shock_20d": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "crowding",
+        "liquidity"
+      ],
+      "sub_family": "liquidity",
+      "unit_type": "score",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal",
+        "turnover_shock"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "price_volume_divergence_20_60": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "divergence",
+        "reaction"
+      ],
+      "sub_family": "reaction",
+      "unit_type": "score",
+      "window": "60d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "overbought_consensus": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "attention",
+        "overreaction"
+      ],
+      "sub_family": "overreaction",
+      "unit_type": "score",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "panic_oversold_score": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "panic",
+        "oversold"
+      ],
+      "sub_family": "oversold",
+      "unit_type": "score",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal",
+        "drawdown"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "crowded_momentum_risk": {
+      "data_family": "price_volume",
+      "behavior_roles": [
+        "crowding",
+        "overreaction"
+      ],
+      "sub_family": "overreaction",
+      "unit_type": "score",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": -1,
+      "allowed_slots": [
+        "price_reaction",
+        "price_momentum",
+        "attention_heat",
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_spread_full_mean": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "liquidity",
+        "spread",
+        "stress"
+      ],
+      "sub_family": "liquidity",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": -1,
+      "allowed_slots": [
+        "liquidity_stress",
+        "orderbook_filter"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_spread_full_std": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "liquidity",
+        "instability",
+        "stress"
+      ],
+      "sub_family": "liquidity",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": -1,
+      "allowed_slots": [
+        "liquidity_stress",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_imbalance_5_full_mean": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "orderbook_pressure",
+        "buy_pressure"
+      ],
+      "sub_family": "pressure",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "orderbook_pressure",
+        "orderbook_filter"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_imbalance_5_open30_mean": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "orderbook_pressure",
+        "open_intent"
+      ],
+      "sub_family": "pressure",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "open30",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "orderbook_pressure",
+        "orderbook_filter"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_imbalance_5_close30_mean": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "orderbook_pressure",
+        "close_chase"
+      ],
+      "sub_family": "pressure",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "close30",
+      "investor_type": "none",
+      "direction": -1,
+      "allowed_slots": [
+        "close_chase",
+        "orderbook_pressure"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_net_bid_change_5_open30_mean": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "orderbook_pressure",
+        "open_intent"
+      ],
+      "sub_family": "net_bid_change",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "open30",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "orderbook_pressure",
+        "orderbook_filter"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_net_bid_change_5_close30_mean": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "orderbook_pressure",
+        "close_chase"
+      ],
+      "sub_family": "net_bid_change",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "close30",
+      "investor_type": "none",
+      "direction": -1,
+      "allowed_slots": [
+        "close_chase",
+        "orderbook_pressure"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_open_buy_intent": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "orderbook_pressure",
+        "open_intent",
+        "confirmation"
+      ],
+      "sub_family": "composite",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "open30",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "orderbook_filter",
+        "orderbook_pressure"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_close_chase_pressure": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "orderbook_pressure",
+        "close_chase",
+        "crowding"
+      ],
+      "sub_family": "composite",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "close30",
+      "investor_type": "none",
+      "direction": -1,
+      "allowed_slots": [
+        "close_chase",
+        "crowding_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_liquidity_stress": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "liquidity",
+        "stress"
+      ],
+      "sub_family": "composite",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": -1,
+      "allowed_slots": [
+        "liquidity_stress",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "ob_close_buying_vs_day": {
+      "data_family": "orderbook",
+      "behavior_roles": [
+        "orderbook_pressure",
+        "close_chase"
+      ],
+      "sub_family": "pressure",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "close30",
+      "investor_type": "none",
+      "direction": -1,
+      "allowed_slots": [
+        "close_chase",
+        "orderbook_pressure"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_net_amount_ratio": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "net_flow"
+      ],
+      "sub_family": "all",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_sm_net_ratio": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "retail",
+        "small_flow"
+      ],
+      "sub_family": "small",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "small",
+      "direction": -1,
+      "allowed_slots": [
+        "retail_flow",
+        "sell_pressure"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_large_net_ratio": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "large_flow",
+        "confirmation"
+      ],
+      "sub_family": "large",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "large",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "large_flow"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_mid_large_net_ratio": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "large_flow",
+        "confirmation"
+      ],
+      "sub_family": "mid_large",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "large",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "large_flow"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_large_vs_small_net": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "divergence",
+        "institution_vs_retail"
+      ],
+      "sub_family": "divergence",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "large_flow"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_active_imbalance": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "active_imbalance"
+      ],
+      "sub_family": "active",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "sell_pressure"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_lg_s3": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "large_flow",
+        "stability"
+      ],
+      "sub_family": "large",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "large",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "large_flow"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_sm_s3": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "retail",
+        "stability"
+      ],
+      "sub_family": "small",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "small",
+      "direction": -1,
+      "allowed_slots": [
+        "retail_flow",
+        "sell_pressure"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_net_amount_ratio_5d": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "net_flow"
+      ],
+      "sub_family": "all",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_large_net_ratio_20d": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "large_flow",
+        "confirmation"
+      ],
+      "sub_family": "large",
+      "unit_type": "ratio",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "large",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "large_flow"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_sm_net_ratio_20d": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "retail",
+        "small_flow"
+      ],
+      "sub_family": "small",
+      "unit_type": "ratio",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "small",
+      "direction": -1,
+      "allowed_slots": [
+        "retail_flow",
+        "sell_pressure"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_large_vs_small_net_20d": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "divergence",
+        "institution_vs_retail"
+      ],
+      "sub_family": "divergence",
+      "unit_type": "ratio",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "large_flow"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "mf_large_positive_days_20d": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "large_flow",
+        "persistence"
+      ],
+      "sub_family": "large",
+      "unit_type": "ratio",
+      "window": "20d",
+      "session": "full",
+      "investor_type": "large",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "large_flow"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "flow_price_divergence_5d": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "divergence",
+        "underreaction"
+      ],
+      "sub_family": "divergence",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "institution_accumulation": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "large_flow",
+        "underreaction"
+      ],
+      "sub_family": "large",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "large",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "large_flow"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "retail_chase_risk": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "retail",
+        "chase",
+        "risk"
+      ],
+      "sub_family": "small",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "small",
+      "direction": -1,
+      "allowed_slots": [
+        "retail_flow",
+        "crowding_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "large_order_confirmed_momentum": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "large_flow",
+        "momentum_confirmation"
+      ],
+      "sub_family": "large",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "large",
+      "direction": 1,
+      "allowed_slots": [
+        "flow_confirm",
+        "large_flow"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "moneyflow_crowding_risk": {
+      "data_family": "moneyflow",
+      "behavior_roles": [
+        "flow",
+        "crowding",
+        "risk"
+      ],
+      "sub_family": "crowding",
+      "unit_type": "ratio",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": -1,
+      "allowed_slots": [
+        "crowding_signal",
+        "state_signal"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "rank_pct",
+        "zscore",
+        "direction_rank",
+        "direction_zscore",
+        "ind_rank_pct",
+        "ind_zscore"
+      ]
+    },
+    "barra_size": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "barra_beta": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "barra_momentum": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "barra_residual_volatility": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "barra_non_linear_size": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "barra_book_to_price": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "barra_liquidity": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "barra_earnings_yield": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "barra_growth": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "barra_leverage": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "barra",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    },
+    "market_cap": {
+      "data_family": "control",
+      "behavior_roles": [
+        "control"
+      ],
+      "sub_family": "size",
+      "unit_type": "score",
+      "window": "daily",
+      "session": "full",
+      "investor_type": "none",
+      "direction": 0,
+      "allowed_slots": [
+        "control"
+      ],
+      "allowed_unary_ops": [
+        "current",
+        "zscore",
+        "rank_pct"
+      ]
+    }
+  }
+}

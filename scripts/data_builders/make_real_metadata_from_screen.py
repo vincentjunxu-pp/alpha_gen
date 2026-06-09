@@ -14,7 +14,7 @@ from alpha_gen.scripts.data_builders.make_metadata_from_columns import build_met
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCREEN = ROOT / "data" / "reference" / "tmt_fundamental_table_screen.json"
-DEFAULT_OUTPUT = ROOT / "data" / "metadata" / "candidate_metadata_from_screen.json"
+DEFAULT_OUTPUT = ROOT / "data" / "metadata" / "generated" / "candidate_metadata_from_screen.json"
 
 SPECIAL_COLUMNS = [
     "industry_code",

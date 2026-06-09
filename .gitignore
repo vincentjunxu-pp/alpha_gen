@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
+pytest-cache-files-*/
 .mypy_cache/
 .ruff_cache/
 build/
@@ -25,8 +26,16 @@ Thumbs.db
 
 # Runtime outputs
 results/
+artifacts/results/
 
-# Large or externally sourced report artifacts
-report/*.pdf
-report/*.png
+# Local datasets and reproducible metadata intermediates
+data/panels/
+data/reference/
+data/metadata/archive/
+data/metadata/generated/
+*.parquet
 
+# Exploratory and externally sourced documents
+notebooks/
+docs/papers/
+docs/reports/

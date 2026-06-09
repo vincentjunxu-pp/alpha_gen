@@ -13,7 +13,9 @@ import pandas as pd
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = REPO_ROOT.parent
 
-DEFAULT_META_PATH = REPO_ROOT / "data" / "metadata" / "real_behavior_metadata.json"
+DEFAULT_META_PATH = (
+    REPO_ROOT / "data" / "metadata" / "production" / "real_behavior_metadata.json"
+)
 DEFAULT_OUTPUT_SUBDIR = "behavior_frequency_analysis"
 
 

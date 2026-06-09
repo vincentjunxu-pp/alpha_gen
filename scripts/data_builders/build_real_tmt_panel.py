@@ -608,8 +608,8 @@ def write_template(path: str | Path) -> None:
 
     template = {
         "output_panel": "alpha_gen/data/panels/real_tmt_daily.parquet",
-        "output_metadata": "alpha_gen/data/metadata/real_metadata.json",
-        "output_coverage": "alpha_gen/data/metadata/real_field_coverage.csv",
+        "output_metadata": "alpha_gen/data/metadata/production/real_metadata.json",
+        "output_coverage": "alpha_gen/artifacts/data_quality/real_field_coverage.csv",
         "close_time": "15:00:00",
         "tmt_values": list(DEFAULT_TMT_VALUES),
         "label_horizon": 20,
@@ -682,8 +682,12 @@ def main() -> None:
     panel, stats, metadata = build_real_tmt_panel(config)
 
     output_panel = Path(config.get("output_panel", "alpha_gen/data/panels/real_tmt_daily.parquet"))
-    output_metadata = Path(config.get("output_metadata", "alpha_gen/data/metadata/real_metadata.json"))
-    output_coverage = Path(config.get("output_coverage", "alpha_gen/data/metadata/real_field_coverage.csv"))
+    output_metadata = Path(
+        config.get("output_metadata", "alpha_gen/data/metadata/production/real_metadata.json")
+    )
+    output_coverage = Path(
+        config.get("output_coverage", "alpha_gen/artifacts/data_quality/real_field_coverage.csv")
+    )
     output_panel.parent.mkdir(parents=True, exist_ok=True)
     output_metadata.parent.mkdir(parents=True, exist_ok=True)
     output_coverage.parent.mkdir(parents=True, exist_ok=True)

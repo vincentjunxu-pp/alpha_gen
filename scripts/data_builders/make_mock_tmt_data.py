@@ -10,7 +10,7 @@ from pandas.tseries.offsets import BDay
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT_PARQUET = ROOT / "data" / "panels" / "mock_tmt_daily.parquet"
-OUT_META = ROOT / "data" / "metadata" / "mock_tmt_metadata.json"
+OUT_META = ROOT / "data" / "metadata" / "fixtures" / "mock_tmt_metadata.json"
 
 N_CONTRACTS = 80
 N_DAYS = 600
