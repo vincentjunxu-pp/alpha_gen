@@ -25,9 +25,9 @@ from alpha_gen.core.torch_backend import TorchEvalContext, cuda_memory_summary
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_PATH = ROOT / "data" / "mock_tmt_daily.parquet"
-META_PATH = ROOT / "data" / "mock_tmt_metadata.json"
-RESULT_DIR = ROOT / "results"
+DATA_PATH = ROOT / "data" / "panels" / "mock_tmt_daily.parquet"
+META_PATH = ROOT / "data" / "metadata" / "mock_tmt_metadata.json"
+RESULT_DIR = ROOT / "artifacts" / "results"
 
 
 def _resolve_date(index: pd.DatetimeIndex, value: str | None, *, default_pos: int, side: str = "left") -> pd.Timestamp:

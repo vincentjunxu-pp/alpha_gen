@@ -5,16 +5,16 @@ import json
 import sys
 from pathlib import Path
 
-WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
-from alpha_gen.data.make_metadata_from_columns import build_metadata, write_metadata
+from alpha_gen.scripts.data_builders.make_metadata_from_columns import build_metadata, write_metadata
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_SCREEN = ROOT / "tmt_fundamental_table_screen.json"
-DEFAULT_OUTPUT = ROOT / "candidate_metadata_from_screen.json"
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_SCREEN = ROOT / "data" / "reference" / "tmt_fundamental_table_screen.json"
+DEFAULT_OUTPUT = ROOT / "data" / "metadata" / "candidate_metadata_from_screen.json"
 
 SPECIAL_COLUMNS = [
     "industry_code",

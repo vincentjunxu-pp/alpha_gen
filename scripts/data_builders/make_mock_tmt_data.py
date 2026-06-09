@@ -8,9 +8,9 @@ import pandas as pd
 from pandas.tseries.offsets import BDay
 
 
-ROOT = Path(__file__).resolve().parent
-OUT_PARQUET = ROOT / "mock_tmt_daily.parquet"
-OUT_META = ROOT / "mock_tmt_metadata.json"
+ROOT = Path(__file__).resolve().parents[2]
+OUT_PARQUET = ROOT / "data" / "panels" / "mock_tmt_daily.parquet"
+OUT_META = ROOT / "data" / "metadata" / "mock_tmt_metadata.json"
 
 N_CONTRACTS = 80
 N_DAYS = 600

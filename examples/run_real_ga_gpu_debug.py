@@ -22,15 +22,15 @@ from alpha_gen.core.gene import load_field_rules
 from alpha_gen.core.preprocess import build_transform_cache, cache_summary, load_panel
 from alpha_gen.core.torch_backend import TorchEvalContext, cuda_memory_summary
 from alpha_gen.core.utils import get_rolling_windows
-from alpha_gen.data.make_metadata_from_columns import metadata_from_panel, write_metadata
+from alpha_gen.scripts.data_builders.make_metadata_from_columns import metadata_from_panel, write_metadata
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_REAL_DATA = ROOT / "data" / "real_tmt_daily.parquet"
-DEFAULT_REAL_META = ROOT / "data" / "real_metadata.json"
-DEFAULT_MOCK_DATA = ROOT / "data" / "mock_tmt_daily.parquet"
-DEFAULT_MOCK_META = ROOT / "data" / "mock_tmt_metadata.json"
-RESULT_DIR = ROOT / "results"
+DEFAULT_REAL_DATA = ROOT / "data" / "panels" / "real_tmt_daily.parquet"
+DEFAULT_REAL_META = ROOT / "data" / "metadata" / "real_metadata.json"
+DEFAULT_MOCK_DATA = ROOT / "data" / "panels" / "mock_tmt_daily.parquet"
+DEFAULT_MOCK_META = ROOT / "data" / "metadata" / "mock_tmt_metadata.json"
+RESULT_DIR = ROOT / "artifacts" / "results"
 
 
 def resolve_default_paths(use_mock: bool) -> tuple[Path, Path]:

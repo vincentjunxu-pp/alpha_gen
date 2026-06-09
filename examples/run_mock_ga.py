@@ -31,9 +31,9 @@ from alpha_gen.core.utils import get_rolling_windows
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_PATH = ROOT / "data" / "mock_tmt_daily.parquet"
-META_PATH = ROOT / "data" / "mock_tmt_metadata.json"
-RESULT_DIR = ROOT / "results"
+DATA_PATH = ROOT / "data" / "panels" / "mock_tmt_daily.parquet"
+META_PATH = ROOT / "data" / "metadata" / "mock_tmt_metadata.json"
+RESULT_DIR = ROOT / "artifacts" / "results"
 
 
 def main() -> None:
