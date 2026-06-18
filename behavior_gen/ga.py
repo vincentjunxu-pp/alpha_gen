@@ -734,6 +734,7 @@ def select_validation_population(
         "rir": "rank_ic_ir",
         "long_rir": "long_rank_ic_ir",
         "ndcg_k": "ndcg_at_k",
+        "neutralized_rir": "neutralized_icir",
     }
     objective_names = NSGA_OBJECTIVE_MODES[nsga_objective_mode]
 
