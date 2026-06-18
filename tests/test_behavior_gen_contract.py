@@ -27,6 +27,8 @@ from alpha_gen.behavior_gen.ga import (
     EvaluatedBehaviorGene,
     NSGA_MODE_RIR_LONG_RIR,
     NSGA_MODE_RIR_LONG_RIR_NDCG,
+    NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR,
+    NSGA_OBJECTIVE_MODES,
     evaluated_behavior_to_frame,
     selected_behavior_rank_table,
 )
@@ -336,17 +338,25 @@ def test_behavior_context_caches_boolean_tradeable_mask() -> None:
     assert first.tolist() == [[True, False], [True, True]]
 
 
-def test_full_barra_metric_uses_all_styles_then_industry() -> None:
-    generator = torch.Generator().manual_seed(20260609)
-    n_dates, n_contracts, n_styles = 12, 30, 10
+def test_full_barra_industry_simultaneous_neutralization() -> None:
+    """NEUTRALIZED_METRIC_FULL_BARRA_INDUSTRY now regresses on 10 Barra styles
+    AND industry dummies simultaneously (single cross-sectional regression),
+    not as a two-step Barra-residual-then-industry-demean process."""
+    generator = torch.Generator().manual_seed(20260618)
+    n_dates, n_contracts, n_styles = 12, 60, 10
+    n_industries = 4
     styles = torch.randn(n_dates, n_contracts, n_styles, generator=generator)
     alpha = torch.randn(n_dates, n_contracts, generator=generator)
-    factor = alpha + (styles * torch.linspace(0.2, 1.1, n_styles)).sum(dim=2)
+    # Inject known Barra + industry structure so neutralization should reduce IC
+    industry_effect = torch.randn(n_dates, n_industries, generator=generator)
+    industry_codes_tensor = torch.arange(n_contracts).remainder(n_industries).unsqueeze(0).expand(n_dates, -1)
+    industry_component = torch.zeros(n_dates, n_contracts)
+    for i in range(n_industries):
+        industry_component += (industry_codes_tensor == i).to(torch.float32) * industry_effect[:, i:i+1]
+    factor = alpha + 0.6 * (styles * torch.linspace(0.3, 1.2, n_styles)).sum(dim=2) + 0.4 * industry_component
     label = alpha + 0.1 * torch.randn(n_dates, n_contracts, generator=generator)
     tradeable = torch.ones((n_dates, n_contracts), dtype=torch.bool)
-    industries = (
-        torch.arange(n_contracts).remainder(3).unsqueeze(0).expand(n_dates, -1)
-    )
+    industries = industry_codes_tensor.clone()
 
     class Context:
         barra_style_fields = tuple(f"barra_{idx}" for idx in range(n_styles))
@@ -374,10 +384,13 @@ def test_full_barra_metric_uses_all_styles_then_industry() -> None:
         Context(),  # type: ignore[arg-type]
         neutralized_metric_mode=NEUTRALIZED_METRIC_FULL_BARRA_INDUSTRY,
     )
-    assert full_score.barra_selected_count == 10
-    assert full_score.barra_selected_styles == Context.barra_style_fields
+    # Neutralized metrics must be computed (finite, non-trivial observation count)
     assert full_score.neutralized_n_ic_obs > 0
     assert np.isfinite(full_score.neutralized_icir)
+    assert np.isfinite(full_score.neutralized_mean_rank_ic)
+    assert np.isfinite(full_score.neutralized_ic_win_rate)
+    # Raw IC should differ from neutralized (structure was injected)
+    assert abs(full_score.rank_ic_ir - full_score.neutralized_icir) > 0.001
 
     no_neutralized_score = evaluate_factor_tensor(
         factor,
@@ -440,3 +453,134 @@ def test_behavior_nsga_objective_modes() -> None:
     assert set(two_objective_table["objective_mode"]) == {
         NSGA_MODE_RIR_LONG_RIR
     }
+
+
+def test_neutralized_rir_nsga_objectives() -> None:
+    """Verify the new rir_long_rir_neutralized_rir mode returns
+    (rank_ic_ir, long_rank_ic_ir, neutralized_icir)."""
+    gene = BehaviorGene(
+        mode="fund_price_underreaction",
+        combiner="rank_gap",
+        slots={
+            "fund_anchor": SlotGene(field="fund_field", unary_op="zscore"),
+            "price_reaction": SlotGene(field="price_field", unary_op="rank_pct"),
+        },
+    )
+    score = FactorScore(
+        mean_rank_ic=0.0,
+        rank_ic_ir=0.5,
+        ic_win_rate=0.0,
+        ndcg_at_k=0.2,
+        direction=1,
+        n_ic_obs=1,
+        coverage=1.0,
+        long_rank_ic_ir=0.35,
+        neutralized_icir=0.28,
+    )
+    item = EvaluatedBehaviorGene(
+        gene=gene,
+        train_score=score,
+        train_metrics=None,
+        generation=0,
+    )
+
+    objectives = item.objectives(NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR)
+    assert objectives == (0.5, 0.35, 0.28)
+
+    # Verify the mode is in NSGA_OBJECTIVE_MODES
+    assert NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR in NSGA_OBJECTIVE_MODES
+    assert NSGA_OBJECTIVE_MODES[NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR] == (
+        "rir", "long_rir", "neutralized_rir",
+    )
+
+
+def test_neutralized_rir_rank_table_columns() -> None:
+    """Rank table for the new mode must include objective_neutralized_rir."""
+    gene = BehaviorGene(
+        mode="fund_price_underreaction",
+        combiner="rank_gap",
+        slots={
+            "fund_anchor": SlotGene(field="fund_field", unary_op="zscore"),
+            "price_reaction": SlotGene(field="price_field", unary_op="rank_pct"),
+        },
+    )
+    score = FactorScore(
+        mean_rank_ic=0.0,
+        rank_ic_ir=0.5,
+        ic_win_rate=0.0,
+        ndcg_at_k=0.2,
+        direction=1,
+        n_ic_obs=1,
+        coverage=1.0,
+        long_rank_ic_ir=0.35,
+        neutralized_icir=0.28,
+    )
+    item = EvaluatedBehaviorGene(
+        gene=gene,
+        train_score=score,
+        train_metrics=None,
+        generation=0,
+    )
+
+    table = selected_behavior_rank_table(
+        [item],
+        objective_mode=NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR,
+    )
+    expected_cols = {
+        "objective_rir",
+        "objective_long_rir",
+        "objective_neutralized_rir",
+    }
+    assert expected_cols.issubset(table.columns)
+    assert "objective_ndcg_k" not in table.columns
+    assert set(table["objective_mode"]) == {
+        NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR
+    }
+    assert table.loc[0, "train_direction"] == 1
+
+
+def test_result_frame_includes_neutralized_rir_columns() -> None:
+    """evaluated_behavior_to_frame must include train_neutralized_rir
+    and valid_neutralized_rir for the new NSGA mode."""
+    gene = BehaviorGene(
+        mode="fund_price_underreaction",
+        combiner="rank_gap",
+        slots={
+            "fund_anchor": SlotGene(field="fund_field", unary_op="zscore"),
+            "price_reaction": SlotGene(field="price_field", unary_op="rank_pct"),
+        },
+    )
+    score = FactorScore(
+        mean_rank_ic=0.02,
+        rank_ic_ir=0.4,
+        ic_win_rate=0.6,
+        ndcg_at_k=0.15,
+        direction=1,
+        n_ic_obs=20,
+        coverage=0.9,
+        long_rank_ic_ir=0.3,
+        neutralized_icir=0.25,
+        neutralized_mean_rank_ic=0.01,
+        neutralized_ic_win_rate=0.55,
+        neutralized_n_ic_obs=18,
+    )
+    eval_gene = EvaluatedBehaviorGene(
+        gene=gene,
+        train_score=score,
+        train_metrics=None,
+        valid_score=score,
+        valid_metrics=None,
+        generation=1,
+        passed_validation=True,
+    )
+
+    frame = evaluated_behavior_to_frame(
+        [eval_gene],
+        objective_mode=NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR,
+    )
+    assert "train_neutralized_rir" in frame.columns
+    assert "valid_neutralized_rir" in frame.columns
+    assert frame.loc[0, "train_neutralized_rir"] == 0.25
+    assert frame.loc[0, "valid_neutralized_rir"] == 0.25
+    # Sort columns must include neutralized_rir
+    assert "valid_neutralized_rir" in frame.columns

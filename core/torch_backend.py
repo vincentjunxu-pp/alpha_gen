@@ -347,6 +347,34 @@ def industry_neutralize_torch(
     return out
 
 
+def _industry_to_dummies_torch(
+    codes: torch.Tensor,
+    mask: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Convert integer industry codes to one-hot dummy variables.
+
+    Args:
+        codes: ``[dates, assets]`` integer industry codes.  ``-1`` marks missing.
+        mask: ``[dates, assets]`` boolean mask for valid observations.
+
+    Returns:
+        ``[dates, assets, n_industries]`` one-hot dummy tensor (float32).
+    """
+    valid = codes >= 0
+    if mask is not None:
+        valid = valid & mask
+
+    flat = codes[valid]
+    if flat.numel() == 0:
+        return torch.zeros(*codes.shape, 0, dtype=torch.float32, device=codes.device)
+
+    unique_codes = torch.unique(flat)
+    # Broadcast comparison: [dates, assets] vs [n_industries] → [dates, assets, n_industries]
+    dummies = (codes.unsqueeze(-1) == unique_codes.unsqueeze(0).unsqueeze(0)).to(torch.float32)
+    dummies = dummies * valid.unsqueeze(-1).to(torch.float32)
+    return dummies
+
+
 def cross_sectional_residual_torch(
     y: torch.Tensor,
     x: torch.Tensor,
@@ -910,14 +938,16 @@ def evaluate_factor_tensor(
                 max_styles=ctx.barra_max_styles,
             ).residual_factor
         else:
-            controls = list(barra_eval.unbind(dim=2))
+            # Simultaneous regression on 10 Barra styles + industry dummies.
+            # Previously this was a two-step process (Barra residual → industry
+            # demean), which double-counted shared Barra–industry covariance.
+            barra_list = list(barra_eval.unbind(dim=2))
+            industry_codes_eval = _take_dates(ctx.industry_codes(), positions)
+            industry_dummies = _industry_to_dummies_torch(industry_codes_eval, tradeable_eval)
+            industry_list = list(industry_dummies.unbind(dim=2))
+            all_controls = barra_list + industry_list
             residual_factor = cross_sectional_multi_residual_torch(
-                factor_eval, controls, mask=tradeable_eval,
-            )
-            residual_factor = industry_neutralize_torch(
-                residual_factor,
-                _take_dates(ctx.industry_codes(), positions),
-                mask=tradeable_eval,
+                factor_eval, all_controls, mask=tradeable_eval,
             )
 
         residual_ic = daily_rank_ic_torch(

@@ -32,9 +32,11 @@ from .torch_backend import (
 
 NSGA_MODE_RIR_LONG_RIR_NDCG = "rir_long_rir_ndcg"
 NSGA_MODE_RIR_LONG_RIR = "rir_long_rir"
+NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR = "rir_long_rir_neutralized_rir"
 NSGA_OBJECTIVE_MODES: dict[str, tuple[str, ...]] = {
     NSGA_MODE_RIR_LONG_RIR_NDCG: ("rir", "long_rir", "ndcg_k"),
     NSGA_MODE_RIR_LONG_RIR: ("rir", "long_rir"),
+    NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR: ("rir", "long_rir", "neutralized_rir"),
 }
 
 
@@ -66,7 +68,7 @@ class BehaviorGAConfig:
     random_seed: int = 20260529
     ndcg_k: int | None = None
     ndcg_top_fraction: float = 0.10
-    nsga_objective_mode: str = NSGA_MODE_RIR_LONG_RIR_NDCG
+    nsga_objective_mode: str = NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR
     min_coverage: float = 0.30
     mode_probabilities: dict[str, float] | None = None
     sampler_config: BehaviorSamplerConfig = field(default_factory=BehaviorSamplerConfig)
@@ -152,6 +154,7 @@ class EvaluatedBehaviorGene:
             "rir": "rank_ic_ir",
             "long_rir": "long_rank_ic_ir",
             "ndcg_k": "ndcg_at_k",
+            "neutralized_rir": "neutralized_icir",
         }
         return tuple(
             float(getattr(self.train_score, _NAME_MAP[name]))
@@ -721,7 +724,7 @@ def select_validation_population(
     validated_genes: list[EvaluatedBehaviorGene],
     population_size: int,
     *,
-    nsga_objective_mode: str = NSGA_MODE_RIR_LONG_RIR_NDCG,
+    nsga_objective_mode: str = NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR,
 ) -> list[EvaluatedBehaviorGene]:
     """Run NSGA‑II on validation GPU scores to select the final population.
 

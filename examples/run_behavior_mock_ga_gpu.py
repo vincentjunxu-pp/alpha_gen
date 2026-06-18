@@ -141,19 +141,16 @@ validated_all = validate_behavior_population(
     ctx=torch_context,
     valid_dates=valid_dates,
     criteria=BehaviorValidationCriteria(
-        min_abs_rank_ic=0.01,
+        min_rank_ic=0.01,
         min_ic_win_rate=0.52,
         min_coverage=MIN_COVERAGE,
     ),
     ndcg_k=config.ndcg_k,
     ndcg_top_fraction=config.ndcg_top_fraction,
-    label_horizon=LABEL_HORIZON,
-    rebalance_freq=REBALANCE_FREQ,
     neutralization_mode=config.neutralization_mode,
     size_field=config.size_field,
     show_progress=SHOW_PROGRESS,
     max_validation_genes=config.population_size * 3,
-    cuda_clear_every=1,
 )
 
 # Step 2: NSGA‑II on validation metrics to pick the final population.
