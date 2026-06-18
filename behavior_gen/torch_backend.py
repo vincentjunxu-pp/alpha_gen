@@ -513,6 +513,15 @@ def calculate_behavior_factor_tensor(
 ) -> torch.Tensor:
     """Calculate a BehaviorGene into a GPU tensor factor.
 
+    .. important::
+       This function returns the **raw factor** (possibly with the
+       configured ``neutralization_mode`` applied to the factor tensor
+       itself).  Neutralized **metrics** (RIC/RIR on the Barra+industry
+       residual) are computed later by
+       :func:`score_behavior_factor_tensor` → :func:`evaluate_factor_tensor`
+       using a **temporary copy** — the factor tensor returned here is
+       never modified by metric-level neutralization.
+
     Parameters
     ----------
     neutralization_mode : str or None

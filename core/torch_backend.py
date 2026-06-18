@@ -350,15 +350,21 @@ def industry_neutralize_torch(
 def _industry_to_dummies_torch(
     codes: torch.Tensor,
     mask: torch.Tensor | None = None,
+    *,
+    drop_first: bool = True,
 ) -> torch.Tensor:
     """Convert integer industry codes to one-hot dummy variables.
 
     Args:
         codes: ``[dates, assets]`` integer industry codes.  ``-1`` marks missing.
         mask: ``[dates, assets]`` boolean mask for valid observations.
+        drop_first: If True (default), drop the first dummy to avoid
+            perfect collinearity with the intercept term in
+            ``cross_sectional_multi_residual_torch``.
 
     Returns:
-        ``[dates, assets, n_industries]`` one-hot dummy tensor (float32).
+        ``[dates, assets, n_industries - (1 if drop_first else 0)]``
+        one-hot dummy tensor (float32).
     """
     valid = codes >= 0
     if mask is not None:
@@ -369,9 +375,16 @@ def _industry_to_dummies_torch(
         return torch.zeros(*codes.shape, 0, dtype=torch.float32, device=codes.device)
 
     unique_codes = torch.unique(flat)
+    n_dummies = unique_codes.numel()
+    if drop_first and n_dummies <= 1:
+        # Cannot drop the only dummy — return empty (intercept-only baseline).
+        return torch.zeros(*codes.shape, 0, dtype=torch.float32, device=codes.device)
+
     # Broadcast comparison: [dates, assets] vs [n_industries] → [dates, assets, n_industries]
     dummies = (codes.unsqueeze(-1) == unique_codes.unsqueeze(0).unsqueeze(0)).to(torch.float32)
     dummies = dummies * valid.unsqueeze(-1).to(torch.float32)
+    if drop_first:
+        dummies = dummies[:, :, 1:]  # drop first dummy, keep intercept + ridge doing the work
     return dummies
 
 

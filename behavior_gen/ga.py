@@ -74,11 +74,6 @@ class BehaviorGAConfig:
     sampler_config: BehaviorSamplerConfig = field(default_factory=BehaviorSamplerConfig)
     neutralization_mode: str = NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY
     size_field: str = "barra_size"
-    label_horizon: int = 20
-    rebalance_freq: int | None = None
-    commission_rate: float = 0.0003
-    slippage_rate: float = 0.0002
-    stamp_tax_rate: float = 0.001
     require_cuda: bool = True
     show_progress: bool = False
 
@@ -105,12 +100,6 @@ class BehaviorGAConfig:
             raise ValueError(
                 f"neutralization_mode must be one of {BEHAVIOR_NEUTRALIZATION_MODES}"
             )
-        if self.label_horizon <= 0:
-            raise ValueError("label_horizon must be positive")
-        if self.rebalance_freq is not None and self.rebalance_freq <= 0:
-            raise ValueError("rebalance_freq must be positive when provided")
-        if min(self.commission_rate, self.slippage_rate, self.stamp_tax_rate) < 0:
-            raise ValueError("transaction cost rates must be non-negative")
 
 
 @dataclass(frozen=True)
@@ -354,10 +343,14 @@ def evaluate_behavior_gene_on_train(
 ) -> EvaluatedBehaviorGene:
     """Calculate and score one behavior gene — **GPU only**.
 
-    Both train and validation scoring run entirely on GPU via
-    :func:`score_behavior_factor_tensor`.  NSGA objectives are read
-    from the resulting :class:`FactorScore` objects — no CPU
-    ``compact_factor_metrics`` is computed here.
+    The factor tensor is computed **once** and then scored on both
+    *train_dates* and (optionally) *valid_dates* using the **same**
+    tensor.  This avoids redundant factor calculation — train and
+    validation metrics are always produced together when *valid_dates*
+    is provided.
+
+    NSGA objectives are read from the resulting :class:`FactorScore`
+    objects — no CPU ``compact_factor_metrics`` is computed here.
     """
 
     key = gene_key(gene)
