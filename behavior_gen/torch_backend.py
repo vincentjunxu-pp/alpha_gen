@@ -9,6 +9,8 @@ import torch
 
 from alpha_gen.core.preprocess import TransformCache
 from alpha_gen.core.torch_backend import (
+    NEUTRALIZED_METRIC_FULL_BARRA_INDUSTRY,
+    NEUTRALIZED_METRIC_NONE,
     _apply_mask,
     _nan_like,
     cross_sectional_residual_torch,
@@ -24,19 +26,59 @@ from alpha_gen.core.torch_backend import (
 from .gene import BehaviorFieldRule, BehaviorGene, ConditionGene, MODE_REGISTRY, SlotGene, validate_gene
 
 
+NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY = "raw_full_barra_industry"
+NEUTRALIZATION_SIZE_THEN_INDUSTRY = "size_then_industry"
+BEHAVIOR_NEUTRALIZATION_MODES = (
+    NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY,
+    NEUTRALIZATION_SIZE_THEN_INDUSTRY,
+)
+
+
+def validate_neutralization_requirements(
+    neutralization_mode: str,
+    *,
+    barra_style_fields: tuple[str, ...],
+    has_industry: bool,
+) -> str | None:
+    """Return an error message when the neutralization mode is incompatible
+    with the provided data, or ``None`` when the configuration is valid."""
+    if neutralization_mode == NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY:
+        if len(barra_style_fields) != 10:
+            return (
+                "raw_full_barra_industry requires exactly 10 Barra style fields, "
+                f"got {len(barra_style_fields)}"
+            )
+        if not has_industry:
+            return "raw_full_barra_industry requires industry data"
+    return None
+
+
 @dataclass
 class BehaviorTorchContext:
-    """GPU tensor context for behavior-finance genes."""
+    """GPU tensor context for behavior-finance genes.
+
+    Parameters
+    ----------
+    max_cache_mb:
+        Soft ceiling for the on-device field-cache in MiB.  When the cache
+        exceeds this size the oldest **non-pinned** entries are evicted
+        (FIFO via dict insertion order).  Permanent tensors — label,
+        tradeable, industry codes, barra styles — are pinned and never
+        evicted.  Set to 0 to disable the limit.
+    """
 
     cache: TransformCache
     behavior_field_rules: Mapping[str, BehaviorFieldRule]
     device: torch.device | str = "auto"
     dtype: torch.dtype = torch.float32
     cache_on_device: bool = True
+    max_cache_mb: float = 4096  # 4 GiB — safe for 12 GiB cards with headroom
     barra_style_fields: Sequence[str] | str = ()
-    barra_corr_threshold: float = 0.30
-    barra_max_styles: int = 3
     _tensor_cache: dict[tuple[object, ...], torch.Tensor] = field(default_factory=dict)
+    _pinned_keys: set[tuple[object, ...]] = field(default_factory=set)
+
+    # -- cached byte-count; updated incrementally so _evict_cache() is O(1)
+    _cache_bytes: int = field(default=0, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.device = resolve_device(str(self.device))
@@ -50,13 +92,62 @@ class BehaviorTorchContext:
                 if text
             )
         )
+        if self.max_cache_mb < 0:
+            raise ValueError("max_cache_mb must be ≥ 0")
         self._validate_cache_layout()
         self.date_index = pd.DatetimeIndex(self.cache.label.index)
 
-    @property
-    def field_rules(self) -> Mapping[str, BehaviorFieldRule]:
-        return self.behavior_field_rules
+    def clear_tensor_cache(self) -> None:
+        """Release all cached GPU tensors to free device memory.
 
+        Call this before a long validation loop to avoid OOM when the
+        training-phase cache already holds several GB of field tensors.
+        Field tensors are re-loaded from CPU on demand afterwards.
+
+        Pinned entries (label, tradeable, …) are preserved.
+        """
+        for key in list(self._tensor_cache):
+            if key in self._pinned_keys:
+                continue
+            self._cache_bytes -= self._tensor_cache[key].element_size() * self._tensor_cache[key].numel()
+            del self._tensor_cache[key]
+        if isinstance(self.device, torch.device) and self.device.type == "cuda":
+            torch.cuda.empty_cache()
+
+    def _pin(self, key: tuple[object, ...]) -> None:
+        """Mark *key* as permanent — it will survive cache eviction."""
+        self._pinned_keys.add(key)
+
+    # ------------------------------------------------------------------
+    # Cache eviction
+    # ------------------------------------------------------------------
+    def _evict_cache(self) -> None:
+        """Drop oldest non-pinned entries while *total* cached bytes exceed
+        *max_cache_mb*.  Dict insertion order in Python ≥ 3.7 gives FIFO
+        semantics — the earliest loaded field is evicted first.
+
+        Does **not** call ``torch.cuda.empty_cache()`` — per-gene driver
+        coalescing happens once in ``evaluate_behavior_gene_on_train``
+        after ``del factor``, avoiding 10–50 redundant driver calls per
+        gene while the cache is at its ceiling.
+        """
+        if self.max_cache_mb <= 0:
+            return
+        max_bytes = int(self.max_cache_mb * 1024 * 1024)
+        if self._cache_bytes <= max_bytes:
+            return
+
+        for key in list(self._tensor_cache):
+            if key in self._pinned_keys:
+                continue
+            if self._cache_bytes <= max_bytes:
+                break
+            tensor = self._tensor_cache.pop(key)
+            self._cache_bytes -= tensor.element_size() * tensor.numel()
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
     def _validate_cache_layout(self) -> None:
         label = self.cache.label
         tradeable = self.cache.tradeable
@@ -70,11 +161,16 @@ class BehaviorTorchContext:
 
     def _frame_to_tensor(self, key: tuple[object, ...], frame: pd.DataFrame) -> torch.Tensor:
         if self.cache_on_device and key in self._tensor_cache:
-            return self._tensor_cache[key]
+            # Move hit entry to end so FIFO eviction keeps recently-used fields.
+            tensor = self._tensor_cache.pop(key)
+            self._tensor_cache[key] = tensor
+            return tensor
         array = frame.to_numpy(dtype=np.float32, copy=False)
         tensor = torch.as_tensor(array, dtype=self.dtype, device=self.device)
         if self.cache_on_device:
             self._tensor_cache[key] = tensor
+            self._cache_bytes += tensor.element_size() * tensor.numel()
+            self._evict_cache()
         return tensor
 
     def get_current(self, field_name: str, use_log: bool = False) -> torch.Tensor:
@@ -84,11 +180,23 @@ class BehaviorTorchContext:
         return self._frame_to_tensor(("current", field_name, use_log), self.cache.current[source_key])
 
     def label(self) -> torch.Tensor:
-        return self._frame_to_tensor(("label",), self.cache.label)
+        key = ("label",)
+        result = self._frame_to_tensor(key, self.cache.label)
+        self._pin(key)
+        return result
 
     def tradeable(self) -> torch.Tensor:
-        tradeable = self._frame_to_tensor(("tradeable",), self.cache.tradeable)
-        return torch.isfinite(tradeable) & (tradeable > 0)
+        key = ("tradeable_mask",)
+        if self.cache_on_device and key in self._tensor_cache:
+            return self._tensor_cache[key]
+        array = self.cache.tradeable.to_numpy(dtype=np.bool_, copy=False)
+        tensor = torch.as_tensor(array, dtype=torch.bool, device=self.device)
+        if self.cache_on_device:
+            self._tensor_cache[key] = tensor
+            self._cache_bytes += tensor.element_size() * tensor.numel()
+            self._pin(key)
+            self._evict_cache()
+        return tensor
 
     def barra_styles(self) -> torch.Tensor:
         label_shape = self.cache.label.shape
@@ -104,6 +212,9 @@ class BehaviorTorchContext:
         stacked = torch.stack(tensors, dim=2)
         if self.cache_on_device:
             self._tensor_cache[key] = stacked
+            self._cache_bytes += stacked.element_size() * stacked.numel()
+            self._pin(key)
+            self._evict_cache()
         return stacked
 
     def industry_codes(self) -> torch.Tensor:
@@ -117,6 +228,9 @@ class BehaviorTorchContext:
         tensor = torch.as_tensor(codes.reshape(industry.shape), dtype=torch.long, device=self.device)
         if self.cache_on_device:
             self._tensor_cache[key] = tensor
+            self._cache_bytes += tensor.element_size() * tensor.numel()
+            self._pin(key)
+            self._evict_cache()
         return tensor
 
     def date_positions(self, dates: pd.DatetimeIndex | None) -> torch.Tensor | None:
@@ -244,17 +358,17 @@ def _apply_conditions(
     ctx: BehaviorTorchContext,
     base_mask: torch.Tensor | None,
     *,
-    gate_fill: str = "zero",
+    gate_fill: str = "nan",
 ) -> torch.Tensor:
     """Apply condition gating to *raw*.
 
     Parameters
     ----------
-    gate_fill : ``"zero"`` or ``"nan"``
+    gate_fill : ``"nan"`` or ``"zero"``
         Fill value for cells that do NOT satisfy the conditions.
-        ``"zero"`` (default) preserves the original behavior but inflates
-        coverage.  ``"nan"`` removes ungated cells from cross-sectional
-        ranking and is recommended for factor discovery.
+        ``"nan"`` (default) removes ungated cells from cross-sectional
+        ranking so coverage reflects the true gated universe.
+        ``"zero"`` preserves the original behavior but inflates coverage.
     """
     if not gene.conditions:
         return raw
@@ -334,7 +448,15 @@ def _combine_behavior_gene(gene: BehaviorGene, values: Mapping[str, torch.Tensor
         if "flow_confirm" in values:
             raw = raw - values["flow_confirm"]
     elif gene.combiner == "anchor_confirm":
-        anchor = values["price_anchor"] if "price_anchor" in values else values["cost_anchor"]
+        if "price_anchor" in values:
+            anchor = values["price_anchor"]
+        elif "cost_anchor" in values:
+            anchor = values["cost_anchor"]
+        else:
+            raise ValueError(
+                f"anchor_confirm combiner requires a price_anchor or cost_anchor slot, "
+                f"got slots {sorted(values)}"
+            )
         raw = anchor + values["price_momentum"] + anchor * values["price_momentum"]
         if "flow_confirm" in values:
             raw = raw + 0.5 * values["flow_confirm"]
@@ -350,17 +472,61 @@ def _combine_behavior_gene(gene: BehaviorGene, values: Mapping[str, torch.Tensor
     return raw
 
 
+def neutralize_behavior_factor_tensor(
+    factor: torch.Tensor,
+    ctx: BehaviorTorchContext,
+    *,
+    neutralization_mode: str,
+    size_field: str = "barra_size",
+    tradeable_mask: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Apply the factor-level neutralization required by one behavior strategy."""
+
+    if neutralization_mode not in BEHAVIOR_NEUTRALIZATION_MODES:
+        raise ValueError(
+            f"neutralization_mode must be one of {BEHAVIOR_NEUTRALIZATION_MODES}, "
+            f"got {neutralization_mode!r}"
+        )
+    if neutralization_mode == NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY:
+        return factor
+
+    size = ctx.get_current(size_field, False)
+    size_mask = torch.isfinite(factor) & torch.isfinite(size)
+    if tradeable_mask is not None:
+        size_mask = size_mask & tradeable_mask
+    residual = cross_sectional_residual_torch(factor, size, mask=size_mask)
+    return industry_neutralize_torch(
+        residual,
+        ctx.industry_codes(),
+        mask=tradeable_mask,
+    )
+
+
 def calculate_behavior_factor_tensor(
     gene: BehaviorGene,
     ctx: BehaviorTorchContext,
     *,
     apply_mode_direction: bool = True,
-    neutralize_size: bool = True,
-    neutralize_industry: bool = False,
+    neutralization_mode: str | None = None,
     size_field: str = "barra_size",
     tradeable_only: bool = True,
 ) -> torch.Tensor:
-    """Calculate a BehaviorGene into a GPU tensor factor."""
+    """Calculate a BehaviorGene into a GPU tensor factor.
+
+    Parameters
+    ----------
+    neutralization_mode : str or None
+        One of ``BEHAVIOR_NEUTRALIZATION_MODES``.  Defaults to
+        ``NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY`` when ``None``.
+    """
+
+    if neutralization_mode is not None and neutralization_mode not in BEHAVIOR_NEUTRALIZATION_MODES:
+        raise ValueError(
+            f"neutralization_mode must be one of {BEHAVIOR_NEUTRALIZATION_MODES}, "
+            f"got {neutralization_mode!r}"
+        )
+    if neutralization_mode is None:
+        neutralization_mode = NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY
 
     errors = validate_gene(gene, ctx.behavior_field_rules)
     if errors:
@@ -377,15 +543,13 @@ def calculate_behavior_factor_tensor(
     if tradeable_only:
         raw = _apply_mask(raw, tradeable_mask)
 
-    if neutralize_industry:
-        raw = industry_neutralize_torch(raw, ctx.industry_codes(), mask=tradeable_mask)
-
-    if neutralize_size:
-        size = ctx.get_current(size_field, False)
-        size_mask = torch.isfinite(raw) & torch.isfinite(size)
-        if tradeable_mask is not None:
-            size_mask = size_mask & tradeable_mask
-        raw = cross_sectional_residual_torch(raw, size, mask=size_mask)
+    raw = neutralize_behavior_factor_tensor(
+        raw,
+        ctx,
+        neutralization_mode=neutralization_mode,
+        size_field=size_field,
+        tradeable_mask=tradeable_mask,
+    )
 
     return raw
 
@@ -398,9 +562,22 @@ def score_behavior_factor_tensor(
     ndcg_k: int | None = None,
     ndcg_top_fraction: float = 0.10,
     direction: int | None = None,
+    neutralization_mode: str = NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY,
 ):
     """Evaluate a behavior factor on GPU using the core tensor evaluator."""
 
+    if neutralization_mode not in BEHAVIOR_NEUTRALIZATION_MODES:
+        raise ValueError(
+            f"neutralization_mode must be one of {BEHAVIOR_NEUTRALIZATION_MODES}, "
+            f"got {neutralization_mode!r}"
+        )
+    error = validate_neutralization_requirements(
+        neutralization_mode,
+        barra_style_fields=ctx.barra_style_fields,
+        has_industry=ctx.cache.industry is not None,
+    )
+    if error is not None:
+        raise ValueError(error)
     return evaluate_factor_tensor(
         factor,
         ctx,  # duck-typed to the core TorchEvalContext interface
@@ -408,4 +585,9 @@ def score_behavior_factor_tensor(
         ndcg_k=ndcg_k,
         ndcg_top_fraction=ndcg_top_fraction,
         direction=direction,
+        neutralized_metric_mode=(
+            NEUTRALIZED_METRIC_FULL_BARRA_INDUSTRY
+            if neutralization_mode == NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY
+            else NEUTRALIZED_METRIC_NONE
+        ),
     )

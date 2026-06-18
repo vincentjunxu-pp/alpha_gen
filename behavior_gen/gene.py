@@ -170,7 +170,7 @@ class BehaviorGene:
     combiner: str
     slots: Mapping[str, SlotGene]
     conditions: tuple[ConditionGene, ...] = ()
-    direction_policy: str = "fixed"
+    direction_policy: str = "train_ic"
     version: int = 1
 
     def to_dict(self) -> dict[str, object]:
@@ -194,7 +194,7 @@ class BehaviorGene:
             combiner=str(raw["combiner"]),
             slots={str(name): SlotGene.from_dict(slot) for name, slot in slots_raw.items()},  # type: ignore[arg-type]
             conditions=tuple(ConditionGene.from_dict(condition) for condition in conditions_raw),  # type: ignore[arg-type]
-            direction_policy=str(raw.get("direction_policy", "fixed")),
+            direction_policy=str(raw.get("direction_policy", "train_ic")),
             version=int(raw.get("version", 1)),
         )
 
@@ -374,10 +374,6 @@ def load_behavior_field_rules(metadata_path: str | Path) -> dict[str, BehaviorFi
     if errors:
         raise ValueError("invalid behavior field metadata: " + "; ".join(errors[:20]))
     return rules
-
-
-def mode_names() -> tuple[str, ...]:
-    return tuple(MODE_REGISTRY)
 
 
 def get_mode_spec(mode: str) -> ModeSpec:
@@ -578,7 +574,7 @@ def gene_key(gene: BehaviorGene) -> tuple[object, ...]:
     slots_key = tuple(sorted((name, slot.field, slot.unary_op) for name, slot in gene.slots.items()))
     conditions_key = tuple(
         sorted(
-            (condition.field, condition.unary_op, condition.condition_op, round(condition.threshold, 4))
+            (condition.field, condition.unary_op, condition.condition_op, condition.threshold)
             for condition in gene.conditions
         )
     )
@@ -606,3 +602,156 @@ def describe_gene(gene: BehaviorGene) -> str:
             for condition in gene.conditions
         )
     return f"{gene.mode}/{gene.combiner}: {mode_text}; 槽位: {slot_text}{condition_text}"
+
+
+def _feature_formula(field: str, unary_op: str) -> str:
+    """Return the exact symbolic formula used by one unary feature transform."""
+
+    if unary_op == "current":
+        return field
+    if unary_op == "rank_pct":
+        return f"(CS_RANK_PCT({field}) - 0.5)"
+    if unary_op == "zscore":
+        return f"CS_ZSCORE({field})"
+    if unary_op == "direction_rank":
+        return f"(FIELD_DIRECTION({field}) * (CS_RANK_PCT({field}) - 0.5))"
+    if unary_op == "direction_zscore":
+        return f"(FIELD_DIRECTION({field}) * CS_ZSCORE({field}))"
+    if unary_op == "ind_rank_pct":
+        return f"(INDUSTRY_RANK_PCT({field}) - 0.5)"
+    if unary_op == "ind_zscore":
+        return f"INDUSTRY_ZSCORE({field})"
+    if unary_op == "ts_zscore_5d":
+        return f"TS_ZSCORE({field}, 5)"
+    if unary_op == "ts_zscore_20d":
+        return f"TS_ZSCORE({field}, 20)"
+    return f"{unary_op}({field})"
+
+
+def _condition_formula(condition: ConditionGene) -> str:
+    value = _feature_formula(condition.field, condition.unary_op)
+    if condition.condition_op == "top_quantile":
+        return f"(CS_RANK_PCT({value}) >= {condition.threshold:g})"
+    if condition.condition_op == "bottom_quantile":
+        return f"(CS_RANK_PCT({value}) <= {1.0 - condition.threshold:g})"
+    if condition.condition_op == "above_median":
+        return f"(CS_RANK_PCT({value}) >= 0.5)"
+    if condition.condition_op == "below_median":
+        return f"(CS_RANK_PCT({value}) < 0.5)"
+    if condition.condition_op == "positive":
+        return f"({value} > 0)"
+    if condition.condition_op == "negative":
+        return f"({value} < 0)"
+    return f"{condition.condition_op}({value}, {condition.threshold:g})"
+
+
+def _sum_formula(items: list[str]) -> str:
+    if not items:
+        return "0"
+    return " + ".join(items)
+
+
+def _combiner_formula(gene: BehaviorGene) -> str:
+    """Mirror behavior_gen.torch_backend._combine_behavior_gene symbolically."""
+
+    if gene.mode not in MODE_REGISTRY:
+        return f"<unknown mode: {gene.mode!r}>"
+    mode_spec = MODE_REGISTRY[gene.mode]
+    ordered = [name for name in mode_spec.slots if name in gene.slots]
+    values = set(gene.slots)
+
+    if gene.combiner in {"rank_gap", "gated_rank_gap"}:
+        return f"({ordered[0]} - {ordered[1]})"
+    if gene.combiner == "residual_gap":
+        return f"CS_RESIDUAL(y={ordered[0]}, x={ordered[1]})"
+    if gene.combiner == "quality_gap":
+        formula = "(profit_growth - cashflow_quality)"
+        if "price_reaction" in values:
+            formula = f"({formula} + 0.25 * ABS(price_reaction))"
+        return formula
+    if gene.combiner == "crowding_interaction":
+        formula = "(growth_anchor * crowding_signal)"
+        if "fund_support" in values:
+            formula = f"({formula} - 0.5 * fund_support)"
+        return formula
+    if gene.combiner in {"confirm", "gated_confirm"}:
+        formula = f"({ordered[0]} + {ordered[1]} + {ordered[0]} * {ordered[1]})"
+        for name in gene.slots:
+            if name in {"fund_anchor", "flow_confirm", "price_anchor", "price_momentum"}:
+                continue
+            if name.endswith("control"):
+                formula = f"({formula} - 0.25 * ABS({name}))"
+            else:
+                formula = f"({formula} + 0.5 * {name})"
+        return formula
+    if gene.combiner == "risk_minus_confirm":
+        risk_names = {
+            "price_momentum",
+            "retail_flow",
+            "close_chase",
+            "attention_heat",
+            "crowding_signal",
+            "liquidity_stress",
+            "turnover_shock",
+        }
+        confirm_names = {"large_flow", "flow_confirm", "fund_support", "orderbook_filter"}
+        risk = [name for name in gene.slots if name in risk_names]
+        confirm = [name for name in gene.slots if name in confirm_names]
+        risk_formula = _sum_formula(risk) if risk else _sum_formula(ordered[:2])
+        return f"(({risk_formula}) - ({_sum_formula(confirm)}))"
+    if gene.combiner == "panic_reversal":
+        formula = "(fund_anchor * drawdown - sell_pressure)"
+        if "orderbook_filter" in values:
+            formula = f"({formula} + orderbook_filter)"
+        return formula
+    if gene.combiner == "attention_risk":
+        formula = "attention_heat"
+        if "price_momentum" in values:
+            formula = f"({formula} + price_momentum)"
+        if "fund_support" in values:
+            formula = f"({formula} - fund_support)"
+        return formula
+    if gene.combiner == "orderbook_intent":
+        formula = "orderbook_pressure"
+        if "liquidity_stress" in values:
+            formula = f"({formula} - liquidity_stress)"
+        if "price_reaction" in values:
+            formula = f"({formula} - 0.25 * ABS(price_reaction))"
+        return formula
+    if gene.combiner == "liquidity_gap":
+        formula = "(liquidity_stress - turnover_shock)"
+        if "flow_confirm" in values:
+            formula = f"({formula} - flow_confirm)"
+        return formula
+    if gene.combiner == "anchor_confirm":
+        anchor_candidates = [name for name in ("price_anchor", "cost_anchor") if name in values]
+        anchor = anchor_candidates[0] if anchor_candidates else "<missing_anchor>"
+        formula = f"({anchor} + price_momentum + {anchor} * price_momentum)"
+        for name in ("flow_confirm", "orderbook_filter", "fund_support"):
+            if name in values:
+                formula = f"({formula} + 0.5 * {name})"
+        return formula
+    return f"{gene.combiner}({', '.join(ordered)})"
+
+
+def describe_gene_formula(gene: BehaviorGene) -> str:
+    """Expand a behavior gene into its field-level symbolic calculation formula."""
+
+    slot_definitions = [
+        f"{name} := {_feature_formula(slot.field, slot.unary_op)}"
+        for name, slot in gene.slots.items()
+    ]
+    raw_formula = _combiner_formula(gene)
+    if gene.conditions:
+        gate = " AND ".join(_condition_formula(condition) for condition in gene.conditions)
+        raw_formula = f"WHERE({gate}, {raw_formula}, 0)"
+
+    if gene.mode in MODE_REGISTRY and gene.direction_policy == "fixed":
+        direction = MODE_REGISTRY[gene.mode].direction
+        factor_formula = raw_formula if direction == 1 else f"(-1 * {raw_formula})"
+    elif gene.direction_policy == "fixed":
+        factor_formula = f"<unknown mode: fixed direction, {raw_formula}>"
+    else:
+        factor_formula = raw_formula
+
+    return "; ".join([*slot_definitions, f"factor := {factor_formula}"])

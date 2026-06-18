@@ -12,6 +12,16 @@ from .metrics import FactorScore
 from .preprocess import TransformCache
 
 
+NEUTRALIZED_METRIC_DYNAMIC_BARRA = "dynamic_barra"
+NEUTRALIZED_METRIC_FULL_BARRA_INDUSTRY = "full_barra_then_industry"
+NEUTRALIZED_METRIC_NONE = "none"
+NEUTRALIZED_METRIC_MODES = (
+    NEUTRALIZED_METRIC_DYNAMIC_BARRA,
+    NEUTRALIZED_METRIC_FULL_BARRA_INDUSTRY,
+    NEUTRALIZED_METRIC_NONE,
+)
+
+
 # ---------------------------------------------------------------------------
 # Torch/CUDA backend.
 #
@@ -115,8 +125,14 @@ class TorchEvalContext:
         return self._frame_to_tensor(("label",), self.cache.label)
 
     def tradeable(self) -> torch.Tensor:
-        tradeable = self._frame_to_tensor(("tradeable",), self.cache.tradeable)
-        return torch.isfinite(tradeable) & (tradeable > 0)
+        key = ("tradeable_mask",)
+        if self.cache_on_device and key in self._tensor_cache:
+            return self._tensor_cache[key]
+        array = self.cache.tradeable.to_numpy(dtype=np.bool_, copy=False)
+        tensor = torch.as_tensor(array, dtype=torch.bool, device=self.device)
+        if self.cache_on_device:
+            self._tensor_cache[key] = tensor
+        return tensor
 
     def barra_styles(self) -> torch.Tensor:
         """Return cached Barra style tensors as [date, contract, style].
@@ -702,6 +718,20 @@ def nan_rank_torch(values: torch.Tensor) -> torch.Tensor:
     return ranks
 
 
+def daily_ic_torch(
+    factor: torch.Tensor,
+    label: torch.Tensor,
+    *,
+    min_cross_section_size: int = 3,
+) -> torch.Tensor:
+    """Daily Pearson IC series on GPU."""
+    valid = torch.isfinite(factor) & torch.isfinite(label)
+    f = torch.where(valid, factor, torch.full_like(factor, float("nan")))
+    l = torch.where(valid, label, torch.full_like(label, float("nan")))
+    ic = _row_corr(f, l, min_cross_section_size=min_cross_section_size)
+    return ic[torch.isfinite(ic)]
+
+
 def daily_rank_ic_torch(
     factor: torch.Tensor,
     label: torch.Tensor,
@@ -753,11 +783,17 @@ def evaluate_factor_tensor(
     n_groups: int = 10,
     direction: int | None = None,
     min_cross_section_size: int = 3,
+    neutralized_metric_mode: str = NEUTRALIZED_METRIC_DYNAMIC_BARRA,
 ) -> FactorScore:
     """Evaluate one factor tensor on the requested dates."""
 
     if direction is not None and direction not in {-1, 1}:
         raise ValueError("direction must be -1, 1, or None")
+    if neutralized_metric_mode not in NEUTRALIZED_METRIC_MODES:
+        raise ValueError(
+            f"neutralized_metric_mode must be one of {NEUTRALIZED_METRIC_MODES}, "
+            f"got {neutralized_metric_mode!r}"
+        )
 
     positions = ctx.date_positions(dates)
     factor_eval = _take_dates(factor, positions)
@@ -781,16 +817,20 @@ def evaluate_factor_tensor(
     if ic_series.numel() == 0:
         return FactorScore(
             mean_rank_ic=0.0,
-            abs_rank_ic=0.0,
             rank_ic_ir=0.0,
             ic_win_rate=0.0,
             ndcg_at_k=0.0,
             direction=1,
             n_ic_obs=0,
             coverage=coverage_value,
+            ic=0.0,
+            ir=0.0,
+            long_rank_ic=0.0,
+            long_rank_ic_ir=0.0,
+            long_ic=0.0,
+            long_ir=0.0,
             neutralized_icir=0.0,
             neutralized_mean_rank_ic=0.0,
-            neutralized_abs_rank_ic=0.0,
             neutralized_ic_win_rate=0.0,
             neutralized_n_ic_obs=0,
         )
@@ -802,6 +842,45 @@ def evaluate_factor_tensor(
 
     ic_std = ic_series.std(unbiased=True) if ic_series.numel() > 1 else torch.tensor(0.0, device=factor.device)
     rank_ic_ir = float((oriented_ic.mean() / ic_std).detach().cpu().item()) if ic_std > 0 else 0.0
+
+    # ---- Pearson IC ------------------------------------------------
+    _ic, _ir = 0.0, 0.0
+    try:
+        pearson_ic = daily_ic_torch(oriented_factor, label_eval, min_cross_section_size=min_cross_section_size)
+        if pearson_ic.numel() > 1:
+            _ic = float(pearson_ic.mean().detach().cpu().item())
+            p_std = pearson_ic.std(unbiased=True)
+            _ir = float((pearson_ic.mean() / p_std).detach().cpu().item()) if p_std > 0 else 0.0
+    except Exception:
+        pass
+
+    # ---- long-side Rank IC & Pearson IC (top-half) ----------------
+    long_rank_ic = 0.0
+    long_rank_ic_ir = 0.0
+    _long_ic = 0.0
+    _long_ir = 0.0
+    try:
+        rank_pct_long = cs_rank_pct_torch(oriented_factor, mask=tradeable_eval)
+        long_mask = tradeable_eval & (rank_pct_long >= 0.5)
+        long_factor = torch.where(long_mask, oriented_factor, _nan_like(oriented_factor))
+        long_label = torch.where(long_mask, label_eval, _nan_like(label_eval))
+        long_ic = daily_rank_ic_torch(long_factor, long_label, min_cross_section_size=min_cross_section_size)
+        if long_ic.numel() > 1:
+            long_ic_mean = long_ic.mean()
+            long_ic_std = long_ic.std(unbiased=True)
+            long_rank_ic = float(long_ic_mean.detach().cpu().item())
+            long_rank_ic_ir = float((long_ic_mean / long_ic_std).detach().cpu().item()) if long_ic_std > 0 else 0.0
+            # ---- long-side Pearson IC (reuse long_mask) ------------
+            try:
+                l_pearson = daily_ic_torch(long_factor, long_label, min_cross_section_size=min_cross_section_size)
+                if l_pearson.numel() > 1:
+                    _long_ic = float(l_pearson.mean().detach().cpu().item())
+                    l_std = l_pearson.std(unbiased=True)
+                    _long_ir = float((l_pearson.mean() / l_std).detach().cpu().item()) if l_std > 0 else 0.0
+            except Exception:
+                pass
+    except Exception:
+        pass
 
     mean_ic = float(mean_ic_tensor.detach().cpu().item())
     ic_win_rate = float((oriented_ic > 0).to(factor.dtype).mean().detach().cpu().item())
@@ -818,37 +897,31 @@ def evaluate_factor_tensor(
     # turn an unevaluated robustness objective into a false positive.
     neutralized_icir = 0.0
     neutralized_mean_rank_ic = 0.0
-    neutralized_abs_rank_ic = 0.0
     neutralized_ic_win_rate = 0.0
     neutralized_n_ic_obs = 0
-    barra_max_abs_corr = 0.0
-    barra_selected_count = 0
-    barra_selected_styles: tuple[str, ...] = ()
 
-    if ctx.barra_style_fields:
+    if neutralized_metric_mode != NEUTRALIZED_METRIC_NONE and ctx.barra_style_fields:
         barra_eval = _take_dates(ctx.barra_styles(), positions)
-        neutralization = dynamic_barra_neutralize_torch(
-            factor_eval,
-            barra_eval,
-            mask=tradeable_eval,
-            corr_threshold=ctx.barra_corr_threshold,
-            max_styles=ctx.barra_max_styles,
-        )
-        if neutralization.abs_mean_corr.numel() > 0:
-            barra_max_abs_corr = float(neutralization.abs_mean_corr.max().detach().cpu().item())
-        barra_selected_count = int(neutralization.selected_mask.sum().detach().cpu().item())
-        selected_flags = neutralization.selected_mask.detach().cpu().tolist()
-        # 记录本因子实际被剥离的 Barra 风格，便于后续排查“伪 Alpha”暴露来源。
-        barra_selected_styles = tuple(
-            field for field, selected in zip(ctx.barra_style_fields, selected_flags) if bool(selected)
-        )
+        if neutralized_metric_mode == NEUTRALIZED_METRIC_DYNAMIC_BARRA:
+            residual_factor = dynamic_barra_neutralize_torch(
+                factor_eval, barra_eval,
+                mask=tradeable_eval,
+                corr_threshold=ctx.barra_corr_threshold,
+                max_styles=ctx.barra_max_styles,
+            ).residual_factor
+        else:
+            controls = list(barra_eval.unbind(dim=2))
+            residual_factor = cross_sectional_multi_residual_torch(
+                factor_eval, controls, mask=tradeable_eval,
+            )
+            residual_factor = industry_neutralize_torch(
+                residual_factor,
+                _take_dates(ctx.industry_codes(), positions),
+                mask=tradeable_eval,
+            )
 
-        # 有 Barra 上下文时必须从 residual_factor 重新计算目标 3。若没有风格
-        # 超过阈值，dynamic_barra_neutralize_torch 按规则返回 residual=factor；
-        # 这仍然是“中性化流水线评估结果”，不是简单复制 raw ICIR。
         residual_ic = daily_rank_ic_torch(
-            neutralization.residual_factor,
-            label_eval,
+            residual_factor, label_eval,
             min_cross_section_size=min_cross_section_size,
         )
         neutralized_n_ic_obs = int(residual_ic.numel())
@@ -866,28 +939,28 @@ def evaluate_factor_tensor(
                 else 0.0
             )
             neutralized_mean_rank_ic = float(residual_mean_tensor.detach().cpu().item())
-            neutralized_abs_rank_ic = abs(neutralized_mean_rank_ic)
             neutralized_ic_win_rate = float(
                 (residual_oriented_ic > 0).to(factor.dtype).mean().detach().cpu().item()
             )
 
     return FactorScore(
         mean_rank_ic=mean_ic,
-        abs_rank_ic=abs(mean_ic),
         rank_ic_ir=rank_ic_ir,
         ic_win_rate=ic_win_rate,
         ndcg_at_k=ndcg,
         direction=direction_value,
         n_ic_obs=int(ic_series.numel()),
         coverage=coverage_value,
+        ic=_ic,
+        ir=_ir,
+        long_rank_ic=long_rank_ic,
+        long_rank_ic_ir=long_rank_ic_ir,
+        long_ic=_long_ic,
+        long_ir=_long_ir,
         neutralized_icir=neutralized_icir,
         neutralized_mean_rank_ic=neutralized_mean_rank_ic,
-        neutralized_abs_rank_ic=neutralized_abs_rank_ic,
         neutralized_ic_win_rate=neutralized_ic_win_rate,
         neutralized_n_ic_obs=neutralized_n_ic_obs,
-        barra_max_abs_corr=barra_max_abs_corr,
-        barra_selected_count=barra_selected_count,
-        barra_selected_styles=barra_selected_styles,
     )
 
 

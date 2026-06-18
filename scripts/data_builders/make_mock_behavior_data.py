@@ -546,7 +546,7 @@ def _build_behavior_metadata() -> tuple[dict[str, dict[str, object]], dict[str, 
             unit_type="score",
             window="ttm",
             direction=1,
-            allowed_slots=["fund_anchor", "fund_support", "cashflow_quality", "quality_anchor"],
+            allowed_slots=["fund_anchor", "fund_support", "cashflow_quality"],
         )
 
     for field in ["ep_ratio_ttm", "book_to_market_ratio_ttm", "value_composite_rank"]:
@@ -558,7 +558,7 @@ def _build_behavior_metadata() -> tuple[dict[str, dict[str, object]], dict[str, 
             unit_type="ratio",
             window="ttm",
             direction=1,
-            allowed_slots=["fund_anchor", "fund_support", "valuation_support"],
+            allowed_slots=["fund_anchor", "fund_support"],
         )
 
     price_role_map = {

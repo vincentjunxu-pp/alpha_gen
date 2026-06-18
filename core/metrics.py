@@ -24,21 +24,22 @@ class FactorScore:
     """Evaluation result for one factor on one date range."""
 
     mean_rank_ic: float
-    abs_rank_ic: float
     rank_ic_ir: float
     ic_win_rate: float
     ndcg_at_k: float
     direction: int
     n_ic_obs: int
     coverage: float
+    ic: float = 0.0                # Pearson IC mean
+    ir: float = 0.0                # Pearson IC IR
+    long_rank_ic: float = 0.0      # top-half RankIC mean
+    long_rank_ic_ir: float = 0.0   # top-half RankIC IR
+    long_ic: float = 0.0           # top-half Pearson IC mean
+    long_ir: float = 0.0           # top-half Pearson IC IR
     neutralized_icir: float = 0.0
     neutralized_mean_rank_ic: float = 0.0
-    neutralized_abs_rank_ic: float = 0.0
     neutralized_ic_win_rate: float = 0.0
     neutralized_n_ic_obs: int = 0
-    barra_max_abs_corr: float = 0.0
-    barra_selected_count: int = 0
-    barra_selected_styles: tuple[str, ...] = ()
 
     @property
     def objectives(self) -> tuple[float, float, float]:
@@ -51,8 +52,13 @@ class FactorScore:
 
         return {
             "mean_rank_ic": self.mean_rank_ic,
-            "abs_rank_ic": self.abs_rank_ic,
             "rank_ic_ir": self.rank_ic_ir,
+            "ic": self.ic,
+            "ir": self.ir,
+            "long_rank_ic": self.long_rank_ic,
+            "long_rank_ic_ir": self.long_rank_ic_ir,
+            "long_ic": self.long_ic,
+            "long_ir": self.long_ir,
             "ic_win_rate": self.ic_win_rate,
             "ndcg_at_k": self.ndcg_at_k,
             "direction": self.direction,
@@ -60,12 +66,8 @@ class FactorScore:
             "coverage": self.coverage,
             "neutralized_icir": self.neutralized_icir,
             "neutralized_mean_rank_ic": self.neutralized_mean_rank_ic,
-            "neutralized_abs_rank_ic": self.neutralized_abs_rank_ic,
             "neutralized_ic_win_rate": self.neutralized_ic_win_rate,
             "neutralized_n_ic_obs": self.neutralized_n_ic_obs,
-            "barra_max_abs_corr": self.barra_max_abs_corr,
-            "barra_selected_count": self.barra_selected_count,
-            "barra_selected_styles": ",".join(self.barra_selected_styles),
         }
 
 
@@ -167,6 +169,23 @@ def daily_rank_ic(
         label,
         method="spearman",
         name="rank_ic",
+        min_cross_section_size=min_cross_section_size,
+    )
+
+
+def daily_ic(
+    factor: pd.DataFrame,
+    label: pd.DataFrame,
+    *,
+    min_cross_section_size: int = 3,
+) -> pd.Series:
+    """Pearson IC for every date, computed on common valid names."""
+
+    return _daily_corr_series(
+        factor,
+        label,
+        method="pearson",
+        name="ic",
         min_cross_section_size=min_cross_section_size,
     )
 
@@ -318,7 +337,6 @@ def evaluate_factor(
     if ic_series.empty:
         return FactorScore(
             mean_rank_ic=0.0,
-            abs_rank_ic=0.0,
             rank_ic_ir=0.0,
             ic_win_rate=0.0,
             ndcg_at_k=0.0,
@@ -327,7 +345,6 @@ def evaluate_factor(
             coverage=_coverage(factor_eval, label_eval, tradeable_eval),
             neutralized_icir=0.0,
             neutralized_mean_rank_ic=0.0,
-            neutralized_abs_rank_ic=0.0,
             neutralized_ic_win_rate=0.0,
             neutralized_n_ic_obs=0,
         )
@@ -354,22 +371,17 @@ def evaluate_factor(
 
     return FactorScore(
         mean_rank_ic=mean_ic,
-        abs_rank_ic=abs(mean_ic),
         rank_ic_ir=rank_ic_ir,
         ic_win_rate=ic_win_rate,
         ndcg_at_k=ndcg_at_k(
-            oriented_factor,
-            label_eval,
-            k=ndcg_k,
-            top_fraction=ndcg_top_fraction,
-            n_groups=n_groups,
+            oriented_factor, label_eval,
+            k=ndcg_k, top_fraction=ndcg_top_fraction, n_groups=n_groups,
         ),
         direction=direction,
         n_ic_obs=int(len(ic_series)),
         coverage=_coverage(factor_eval, label_eval, tradeable_eval),
         neutralized_icir=neutralized_icir,
         neutralized_mean_rank_ic=0.0,
-        neutralized_abs_rank_ic=0.0,
         neutralized_ic_win_rate=0.0,
         neutralized_n_ic_obs=0,
     )

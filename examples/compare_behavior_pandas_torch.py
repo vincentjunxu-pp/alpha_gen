@@ -382,8 +382,7 @@ def pandas_behavior_factor(
     behavior_rules: Mapping[str, BehaviorFieldRule],
     *,
     apply_mode_direction: bool,
-    neutralize_size: bool,
-    neutralize_industry: bool,
+    neutralization_mode: str,
     size_field: str,
     tradeable_only: bool,
 ) -> pd.DataFrame:
@@ -402,17 +401,15 @@ def pandas_behavior_factor(
     if tradeable_only:
         raw = raw.where(tradeable_mask)
 
-    if neutralize_industry:
-        if cache.industry is None:
-            raise ValueError("neutralize_industry=True requires an industry matrix")
-        raw = industry_neutralize(raw, cache.industry, mask=tradeable_mask)
-
-    if neutralize_size:
+    if neutralization_mode == "size_then_industry":
         size = cache.get_current(size_field, False)
         size_mask = finite_mask(raw) & finite_mask(size)
         if tradeable_mask is not None:
             size_mask = size_mask & tradeable_mask
         raw = cross_sectional_residual(raw, size, mask=size_mask)
+        if cache.industry is not None:
+            raw = industry_neutralize(raw, cache.industry, mask=tradeable_mask)
+    # "raw_full_barra_industry" keeps the raw factor unchanged
 
     return raw.astype("float32")
 
@@ -490,11 +487,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--start-date", default=None)
     parser.add_argument("--end-date", default=None)
     parser.add_argument("--apply-mode-direction", action="store_true")
-    parser.add_argument("--neutralize-size", action="store_true")
-    parser.add_argument("--neutralize-industry", action="store_true")
+    parser.add_argument(
+        "--neutralization-mode",
+        default="raw_full_barra_industry",
+        choices=("raw_full_barra_industry", "size_then_industry"),
+        help="Neutralization strategy for the behavior factor.",
+    )
     parser.add_argument("--include-untradeable", action="store_true")
     parser.add_argument("--cache-on-device", action="store_true")
     return parser.parse_args()
+
+
+def _neutralization_mode_from_args(args: argparse.Namespace) -> str:
+    return str(args.neutralization_mode)
 
 
 def main() -> None:
@@ -506,7 +511,7 @@ def main() -> None:
     metadata = json.loads(meta_path.read_text(encoding="utf-8"))
     size_field = str(metadata.get("size_field", "barra_size"))
     needed_fields = gene_fields(gene)
-    if args.neutralize_size:
+    if args.neutralization_mode == "size_then_industry":
         needed_fields.add(size_field)
 
     field_rules_all: Mapping[str, FieldRule] = load_field_rules(meta_path)
@@ -533,7 +538,7 @@ def main() -> None:
         label_col=args.label_col,
         tradeable_col=args.tradeable_col,
         industry_col=args.industry_col,
-        extra_current_fields=[size_field] if args.neutralize_size else None,
+        extra_current_fields=[size_field] if args.neutralization_mode == "size_then_industry" else None,
     )
 
     ctx = BehaviorTorchContext(
@@ -546,8 +551,7 @@ def main() -> None:
         gene,
         ctx,
         apply_mode_direction=args.apply_mode_direction,
-        neutralize_size=args.neutralize_size,
-        neutralize_industry=args.neutralize_industry,
+        neutralization_mode=_neutralization_mode_from_args(args),
         size_field=size_field,
         tradeable_only=not args.include_untradeable,
     )
@@ -557,8 +561,7 @@ def main() -> None:
         cache,
         behavior_rules,
         apply_mode_direction=args.apply_mode_direction,
-        neutralize_size=args.neutralize_size,
-        neutralize_industry=args.neutralize_industry,
+        neutralization_mode=_neutralization_mode_from_args(args),
         size_field=size_field,
         tradeable_only=not args.include_untradeable,
     )
@@ -572,8 +575,7 @@ def main() -> None:
 
     print("gene:", gene.to_dict())
     print("apply_mode_direction:", args.apply_mode_direction)
-    print("neutralize_size:", args.neutralize_size)
-    print("neutralize_industry:", args.neutralize_industry)
+    print("neutralization_mode:", args.neutralization_mode)
     print("tradeable_only:", not args.include_untradeable)
     print_summary(compare_frames(pandas_factor, torch_factor))
 

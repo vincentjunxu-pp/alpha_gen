@@ -17,7 +17,6 @@ from .gene import (
     fields_for_slot,
     get_mode_spec,
     is_valid_gene,
-    mode_names,
     validate_gene,
 )
 
@@ -29,7 +28,7 @@ class BehaviorSamplerConfig:
     optional_slot_probability: float = 0.6
     condition_probability: float = 0.45
     condition_thresholds: tuple[float, ...] = (0.55, 0.60, 0.70, 0.80)
-    direction_policies: tuple[str, ...] = ("fixed", "train_ic")
+    direction_policies: tuple[str, ...] = ("train_ic", "fixed")
 
 
 def _choice(rng: np.random.Generator, values: list[str] | tuple[str, ...]) -> str:
@@ -61,17 +60,9 @@ def _allowed_unary_ops(rule: BehaviorFieldRule) -> list[str]:
     return [op for op in rule.allowed_unary_ops if op]
 
 
-def _slot_candidates(
-    field_rules: Mapping[str, BehaviorFieldRule],
-    slot_name: str,
-    slot_spec: SlotSpec,
-) -> list[str]:
-    return fields_for_slot(field_rules, slot_name, slot_spec)
-
-
 def _mode_has_candidates(mode_spec: ModeSpec, field_rules: Mapping[str, BehaviorFieldRule]) -> bool:
     for slot_name, slot_spec in mode_spec.slots.items():
-        if slot_spec.required and not _slot_candidates(field_rules, slot_name, slot_spec):
+        if slot_spec.required and not fields_for_slot(field_rules, slot_name, slot_spec):
             return False
     return bool(mode_spec.allowed_combiners)
 
@@ -102,7 +93,7 @@ def _sample_slot(
     *,
     excluded_fields: set[str] | None = None,
 ) -> SlotGene:
-    candidates = _slot_candidates(field_rules, slot_name, slot_spec)
+    candidates = fields_for_slot(field_rules, slot_name, slot_spec)
     if excluded_fields:
         candidates = [field for field in candidates if field not in excluded_fields]
     if not candidates:
@@ -122,7 +113,7 @@ def _slot_gene_is_valid(
     rule = field_rules[slot.field]
     if slot.unary_op not in rule.allowed_unary_ops:
         return False
-    return slot.field in _slot_candidates(field_rules, slot_name, slot_spec)
+    return slot.field in fields_for_slot(field_rules, slot_name, slot_spec)
 
 
 def _sample_slots(
@@ -137,7 +128,7 @@ def _sample_slots(
         if slot_spec.required or rng.random() < config.optional_slot_probability:
             candidates = [
                 field
-                for field in _slot_candidates(field_rules, slot_name, slot_spec)
+                for field in fields_for_slot(field_rules, slot_name, slot_spec)
                 if field not in used_fields
             ]
             if candidates:
@@ -227,7 +218,7 @@ def _repair_slot(
         return slot
     candidates = [
         field
-        for field in _slot_candidates(field_rules, slot_name, slot_spec)
+        for field in fields_for_slot(field_rules, slot_name, slot_spec)
         if not excluded_fields or field not in excluded_fields
     ]
     if not candidates:
@@ -313,11 +304,11 @@ def repair_gene(
             used_fields.add(repaired.field)
 
     conditions = _repair_conditions(gene.conditions, mode_spec, field_rules, rng, config)
-    direction_policy = gene.direction_policy if gene.direction_policy in config.direction_policies else "fixed"
+    direction_policy = gene.direction_policy if gene.direction_policy in config.direction_policies else "train_ic"
     if direction_policy not in DIRECTION_POLICIES:
-        direction_policy = "fixed"
+        direction_policy = "train_ic"
     if direction_policy == "regime_switch" and mode_spec.direction_policy != "regime_switch":
-        direction_policy = "fixed"
+        direction_policy = "train_ic"
 
     repaired_gene = BehaviorGene(
         mode=mode,
@@ -352,7 +343,7 @@ def repair_gene(
         combiner=mode_spec.default_combiner,
         slots=fresh_slots,
         conditions=(),
-        direction_policy="fixed",
+        direction_policy="train_ic",
     )
     if is_valid_gene(fresh, field_rules):
         return fresh

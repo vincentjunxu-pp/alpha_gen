@@ -53,9 +53,37 @@
   - `field_rules`：给旧 `core.preprocess.build_transform_cache` 建缓存用。
   - `behavior_field_rules`：给行为基因采样和验证用。
 
+## 5. 中性化策略
+
+`BehaviorGAConfig.neutralization_mode` 只允许以下两个值：
+
+- `raw_full_barra_industry`
+  - 原因子不做强制市值或行业中性化。
+  - 原始 IC/RIC、组合指标直接在原因子上计算。
+  - 中性化 RIC/RIR 使用全部 10 个 Barra 风格同时做截面回归，
+    对回归残差再做行业中性化后计算。
+- `size_then_industry`
+  - 因子统一先对 `size_field` 做截面回归，再做行业内去均值。
+  - 不执行 Barra 风格中性化，也不计算中性化 RIC/RIR；结果列为
+    `NaN`。
+
+行为框架不再使用动态 Barra 风格筛选。切换策略时，训练和验证必须使用
+同一个 `neutralization_mode`。
+
+## 6. NSGA-II 目标
+
+`BehaviorGAConfig.nsga_objective_mode` 支持：
+
+- `rir_long_rir_ndcg`：最大化 `rir`、`long_rir`、`ndcg_k`。
+- `rir_long_rir`：最大化 `rir`、`long_rir`。
+
+默认使用三目标版本。NSGA-II 排名表会记录 `objective_mode`，并将目标列
+命名为 `objective_rir`、`objective_long_rir` 和可选的
+`objective_ndcg_k`。
+
 真实数据接入时，只要保持同样长表结构，并补齐 `behavior_field_rules` 的 `data_family`、`behavior_roles`、`direction`、`allowed_slots`、`allowed_unary_ops` 即可。`sub_family`、`sub_type`、`unit_type`、`window`、`session`、`investor_type` 不参与当前 `behavior_gen` 的采样、校验或计算，因此实际 meta 不再保存。
 
-## 5. 已完成调试
+## 7. 已完成调试
 
 在 `pytorch` conda 环境下完成：
 
@@ -101,7 +129,7 @@ conda run -n pytorch python examples\run_behavior_mock_ga_gpu.py --population-si
 
 注意：当前 `conda run` 会额外打印 OpenCL vendor 文件权限噪声，但命令退出码为 0，CUDA 计算已正常执行。
 
-## 6. 常用运行命令
+## 8. 常用运行命令
 
 重新生成模拟数据：
 
@@ -121,7 +149,7 @@ conda run -n pytorch python examples\run_behavior_mock_ga_gpu.py --population-si
 conda run -n pytorch python examples\run_behavior_mock_ga_gpu.py --population-size 64 --generations 3 --train-days 360 --valid-days 80 --prefix behavior_local
 ```
 
-## 7. 已知BUG修复记录 (2026-05-29)
+## 9. 已知BUG修复记录 (2026-05-29)
 
 ### 7.1 `attention_risk` combiner + `retail_chase_risk` mode 运行时崩溃
 
@@ -137,7 +165,7 @@ conda run -n pytorch python examples\run_behavior_mock_ga_gpu.py --population-si
 - `panic_reversal` 移除 `"gated_confirm"`
 - `orderbook_intent` 移除 `"confirm"` 和 `"gated_confirm"`
 
-## 8. 后续建议
+## 10. 后续建议
 
 1. 接真实数据前先只替换 parquet 和 metadata，不改代码，验证字段规则是否完整。
 2. 每新增一类字段，先在 `behavior_field_rules` 中标注 `behavior_roles` 和 `allowed_slots`，再决定是否新增 mode。

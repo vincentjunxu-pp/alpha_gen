@@ -72,9 +72,9 @@ class BatchFactorEvaluator:
         )
         # 提取全历史(all)的IC指标
         eval_metrics_ic = [
-            "ic_1d", "ir_1d", "ric_1d", "rir_1d",
-            "ic_5d", "ir_5d", "ric_5d", "rir_5d",
-            "ic_20d", "ir_20d", "ric_20d", "rir_20d",
+            "ic_1d", "ir_1d", "ric_1d", "rir_1d", "long_ic_1d", "long_ric_1d",
+            "ic_5d", "ir_5d", "ric_5d", "rir_5d", "long_ic_5d", "long_ric_5d",
+            "ic_20d", "ir_20d", "ric_20d", "rir_20d", "long_ic_20d", "long_ric_20d",
         ]
 
         for metric in eval_metrics_ic:
@@ -99,30 +99,54 @@ class BatchFactorEvaluator:
             res_summary[metric] = pnl_res_dict.get(metric)
 
         if self.figure:
-            fig, axes = plt.subplots(1, 3, figsize=(14, 3))
-
-            ic_res_dict_all["ric_series_1d"].cumsum().plot(
-                ax=axes[0],
-                title="Cumulative RankIC 1D",
-                grid=True,
+            # ---- 自动发现所有 horizon（1d/5d/20d...）----
+            horizons = sorted(
+                {
+                    key.replace("ric_series_", "")
+                    for key in ic_res_dict_all
+                    if key.startswith("ric_series_") and "long_" not in key
+                }
             )
-            axes[0].axhline(0, color="black", linewidth=0.8)
+            n = len(horizons)
+            if n > 0:
+                fig, axes = plt.subplots(1, n, figsize=(6 * n, 4))
+                if n == 1:
+                    axes = [axes]
 
-            ic_res_dict_all["ric_series_5d"].cumsum().plot(
-                ax=axes[1],
-                title="Cumulative RankIC 5D",
-                grid=True,
-            )
-            axes[1].axhline(0, color="black", linewidth=0.8)
+                for i, horizon in enumerate(horizons):
+                    ax = axes[i]
 
-            ic_res_dict_all["ric_series_20d"].cumsum().plot(
-                ax=axes[2],
-                title="Cumulative RankIC 20D",
-                grid=True,
-            )
-            axes[2].axhline(0, color="black", linewidth=0.8)
-            plt.tight_layout()
-            plt.show()
+                    # RIC
+                    s = ic_res_dict_all.get(f"ric_series_{horizon}")
+                    if s is not None:
+                        s.cumsum().plot(ax=ax, label="RIC", linewidth=1.5)
+
+                    # IC
+                    s = ic_res_dict_all.get(f"ic_series_{horizon}")
+                    if s is not None:
+                        s.cumsum().plot(ax=ax, label="IC", linewidth=1.5)
+
+                    # Long RIC (top 50%)
+                    s = ic_res_dict_all.get(f"long_ric_series_{horizon}")
+                    if s is not None:
+                        s.cumsum().plot(
+                            ax=ax, label="Long RIC", linewidth=1.5, linestyle="--"
+                        )
+
+                    # Long IC (top 50%)
+                    s = ic_res_dict_all.get(f"long_ic_series_{horizon}")
+                    if s is not None:
+                        s.cumsum().plot(
+                            ax=ax, label="Long IC", linewidth=1.5, linestyle="--"
+                        )
+
+                    ax.set_title(f"Cumulative IC — {horizon}")
+                    ax.axhline(0, color="black", linewidth=0.8)
+                    ax.grid(True)
+                    ax.legend()
+
+                plt.tight_layout()
+                plt.show()
 
         if self.figure:
             fig, axes = plt.subplots(1, 3, figsize=(18, 4))

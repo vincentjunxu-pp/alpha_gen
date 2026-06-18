@@ -98,7 +98,7 @@ class GAConfig:
 class ValidationCriteria:
     """Validation filters inspired by the report."""
 
-    min_abs_rank_ic: float = 0.02
+    min_rank_ic: float = 0.02
     min_ic_win_rate: float = 0.55
     min_top_excess_ann: float = 0.02
     min_coverage: float = 0.30
@@ -231,7 +231,6 @@ def _empty_score() -> FactorScore:
 
     return FactorScore(
         mean_rank_ic=0.0,
-        abs_rank_ic=0.0,
         rank_ic_ir=0.0,
         ic_win_rate=0.0,
         ndcg_at_k=0.0,
@@ -240,7 +239,6 @@ def _empty_score() -> FactorScore:
         coverage=0.0,
         neutralized_icir=0.0,
         neutralized_mean_rank_ic=0.0,
-        neutralized_abs_rank_ic=0.0,
         neutralized_ic_win_rate=0.0,
         neutralized_n_ic_obs=0,
     )
@@ -752,7 +750,7 @@ def validate_population(
                 pnl_metrics = _scalar_pnl_metrics(pnl_result)
                 top_excess_ann = float(pnl_metrics.get("pnl_long_excess_ann", 0.0))
             passed = (
-                valid_score.abs_rank_ic >= criteria.min_abs_rank_ic
+                abs(valid_score.mean_rank_ic) >= criteria.min_rank_ic
                 and valid_score.ic_win_rate >= criteria.min_ic_win_rate
                 and top_excess_ann >= criteria.min_top_excess_ann
                 and valid_score.coverage >= criteria.min_coverage

@@ -77,7 +77,7 @@ class TreeGAConfig:
 
 @dataclass(frozen=True)
 class TreeValidationCriteria:
-    min_abs_rank_ic: float = 0.02
+    min_rank_ic: float = 0.02
     min_ic_win_rate: float = 0.55
     min_top_excess_ann: float = 0.00
     min_coverage: float = 0.30
@@ -134,7 +134,6 @@ def _empty_score() -> FactorScore:
     """
     return FactorScore(
         mean_rank_ic=_INVALID_SCORE,
-        abs_rank_ic=_INVALID_SCORE,
         rank_ic_ir=_INVALID_SCORE,
         ic_win_rate=_INVALID_SCORE,
         ndcg_at_k=_INVALID_SCORE,
@@ -143,7 +142,6 @@ def _empty_score() -> FactorScore:
         coverage=0.0,
         neutralized_icir=_INVALID_SCORE,
         neutralized_mean_rank_ic=_INVALID_SCORE,
-        neutralized_abs_rank_ic=_INVALID_SCORE,
         neutralized_ic_win_rate=_INVALID_SCORE,
         neutralized_n_ic_obs=0,
     )
@@ -524,7 +522,7 @@ def validate_tree_population(
             pnl_metrics = _scalar_pnl_metrics(pnl_result)
             top_excess_ann = float(pnl_metrics.get("pnl_long_excess_ann", 0.0))
             passed = (
-                valid_score.abs_rank_ic >= criteria.min_abs_rank_ic
+                abs(valid_score.mean_rank_ic) >= criteria.min_rank_ic
                 and valid_score.ic_win_rate >= criteria.min_ic_win_rate
                 and top_excess_ann >= criteria.min_top_excess_ann
                 and valid_score.coverage >= criteria.min_coverage

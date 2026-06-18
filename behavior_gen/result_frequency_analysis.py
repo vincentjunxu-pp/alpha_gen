@@ -45,16 +45,20 @@ def parse_args() -> argparse.Namespace:
         help=f"Output directory. Defaults to <result-dir>/{DEFAULT_OUTPUT_SUBDIR}.",
     )
     parser.add_argument(
+        "--min-train-ric",
         "--min-train-abs-rank-ic",
+        dest="min_train_ric",
         type=float,
         default=0.05,
-        help="Keep rows with train_abs_rank_ic above this threshold when the column exists.",
+        help="Keep rows with absolute train_ric above this threshold.",
     )
     parser.add_argument(
+        "--min-train-rir",
         "--min-train-rank-ic-ir",
+        dest="min_train_rir",
         type=float,
         default=0.30,
-        help="Keep rows with train_rank_ic_ir above this threshold when the column exists.",
+        help="Keep rows with train_rir above this threshold.",
     )
     parser.add_argument(
         "--passed-validation-only",
@@ -168,11 +172,11 @@ def field_meta_maps(field_meta: pd.DataFrame) -> dict[str, dict[str, Any]]:
 def metric_filter(df: pd.DataFrame, args: argparse.Namespace) -> pd.DataFrame:
     out = df.copy()
     numeric_candidates = (
-        "train_abs_rank_ic",
-        "train_rank_ic_ir",
-        "train_neutralized_abs_rank_ic",
-        "valid_abs_rank_ic",
-        "valid_rank_ic_ir",
+        "train_ric",
+        "train_rir",
+        "train_neutralized_ric",
+        "valid_ric",
+        "valid_rir",
     )
     for col in numeric_candidates:
         if col in out.columns:
@@ -192,10 +196,10 @@ def metric_filter(df: pd.DataFrame, args: argparse.Namespace) -> pd.DataFrame:
         return out.reset_index(drop=True)
 
     masks = []
-    if "train_abs_rank_ic" in out.columns and args.min_train_abs_rank_ic is not None:
-        masks.append(out["train_abs_rank_ic"] > args.min_train_abs_rank_ic)
-    if "train_rank_ic_ir" in out.columns and args.min_train_rank_ic_ir is not None:
-        masks.append(out["train_rank_ic_ir"] > args.min_train_rank_ic_ir)
+    if "train_ric" in out.columns and args.min_train_ric is not None:
+        masks.append(out["train_ric"].abs() > args.min_train_ric)
+    if "train_rir" in out.columns and args.min_train_rir is not None:
+        masks.append(out["train_rir"] > args.min_train_rir)
     if masks:
         mask = masks[0]
         for item in masks[1:]:
@@ -563,8 +567,8 @@ def write_outputs(
         "filtered_rows": int(len(filtered_df)),
         "filters": {
             "no_quality_filter": bool(args.no_quality_filter),
-            "min_train_abs_rank_ic": args.min_train_abs_rank_ic,
-            "min_train_rank_ic_ir": args.min_train_rank_ic_ir,
+            "min_train_ric": args.min_train_ric,
+            "min_train_rir": args.min_train_rir,
             "passed_validation_only": bool(args.passed_validation_only),
             "dedupe": bool(args.dedupe),
         },

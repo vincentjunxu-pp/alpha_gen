@@ -2,12 +2,16 @@
 
 from .ga import (
     BehaviorGAConfig,
+    NSGA_MODE_RIR_LONG_RIR,
+    NSGA_MODE_RIR_LONG_RIR_NDCG,
+    NSGA_OBJECTIVE_MODES,
     BehaviorSearchResult,
     BehaviorValidationCriteria,
     EvaluatedBehaviorGene,
     evaluated_behavior_to_frame,
     export_behavior_search_result,
     run_behavior_ga_search,
+    select_validation_population,
     validate_behavior_population,
 )
 from .gene import (
@@ -18,28 +22,43 @@ from .gene import (
     SlotGene,
     SlotSpec,
     describe_gene,
+    describe_gene_formula,
     load_behavior_field_rules,
     validate_gene,
 )
 from .sampler import BehaviorSamplerConfig, random_gene, random_population
-from .torch_backend import BehaviorTorchContext, calculate_behavior_factor_tensor, score_behavior_factor_tensor
+from .torch_backend import (
+    BEHAVIOR_NEUTRALIZATION_MODES,
+    NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY,
+    NEUTRALIZATION_SIZE_THEN_INDUSTRY,
+    BehaviorTorchContext,
+    calculate_behavior_factor_tensor,
+    score_behavior_factor_tensor,
+)
 
 
 __all__ = [
     "BehaviorFieldRule",
     "BehaviorGAConfig",
+    "NSGA_MODE_RIR_LONG_RIR",
+    "NSGA_MODE_RIR_LONG_RIR_NDCG",
+    "NSGA_OBJECTIVE_MODES",
     "BehaviorGene",
     "BehaviorSamplerConfig",
     "BehaviorSearchResult",
     "BehaviorTorchContext",
+    "BEHAVIOR_NEUTRALIZATION_MODES",
     "BehaviorValidationCriteria",
     "ConditionGene",
     "EvaluatedBehaviorGene",
     "ModeSpec",
+    "NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY",
+    "NEUTRALIZATION_SIZE_THEN_INDUSTRY",
     "SlotGene",
     "SlotSpec",
     "calculate_behavior_factor_tensor",
     "describe_gene",
+    "describe_gene_formula",
     "evaluated_behavior_to_frame",
     "export_behavior_search_result",
     "load_behavior_field_rules",
@@ -47,6 +66,7 @@ __all__ = [
     "random_population",
     "run_behavior_ga_search",
     "score_behavior_factor_tensor",
+    "select_validation_population",
     "validate_behavior_population",
     "validate_gene",
 ]
