@@ -31,6 +31,7 @@ from .sampler import BehaviorSamplerConfig, random_gene, random_population
 from .torch_backend import (
     BEHAVIOR_NEUTRALIZATION_MODES,
     NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY,
+    NEUTRALIZATION_RAW_NONE,
     NEUTRALIZATION_SIZE_THEN_INDUSTRY,
     BehaviorTorchContext,
     calculate_behavior_factor_tensor,
@@ -55,6 +56,7 @@ __all__ = [
     "EvaluatedBehaviorGene",
     "ModeSpec",
     "NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY",
+    "NEUTRALIZATION_RAW_NONE",
     "NEUTRALIZATION_SIZE_THEN_INDUSTRY",
     "SlotGene",
     "SlotSpec",

@@ -28,9 +28,11 @@ from .gene import BehaviorFieldRule, BehaviorGene, ConditionGene, MODE_REGISTRY,
 
 NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY = "raw_full_barra_industry"
 NEUTRALIZATION_SIZE_THEN_INDUSTRY = "size_then_industry"
+NEUTRALIZATION_RAW_NONE = "raw_none"
 BEHAVIOR_NEUTRALIZATION_MODES = (
     NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY,
     NEUTRALIZATION_SIZE_THEN_INDUSTRY,
+    NEUTRALIZATION_RAW_NONE,
 )
 
 
@@ -487,7 +489,7 @@ def neutralize_behavior_factor_tensor(
             f"neutralization_mode must be one of {BEHAVIOR_NEUTRALIZATION_MODES}, "
             f"got {neutralization_mode!r}"
         )
-    if neutralization_mode == NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY:
+    if neutralization_mode in (NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY, NEUTRALIZATION_RAW_NONE):
         return factor
 
     size = ctx.get_current(size_field, False)
