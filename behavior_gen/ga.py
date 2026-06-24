@@ -419,7 +419,7 @@ def evaluate_behavior_gene_on_train(
                 long_weight = long_weight / denom
                 barra = ctx.barra_styles()               # (T, C, 10)
                 exposure = (long_weight.unsqueeze(2) * barra).sum(dim=1)  # (T, 10)
-                barra_exposure = float(exposure.abs().max(dim=1).values.nanmean().item())
+                barra_exposure = float(exposure.abs().nanmean().item())
             except Exception:
                 barra_exposure = None
 
