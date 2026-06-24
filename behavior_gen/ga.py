@@ -400,14 +400,22 @@ def evaluate_behavior_gene_on_train(
                 if not error:
                     error = f"valid {type(exc).__name__}: {exc}"
 
-        # ---- Barra exposure (long-short weight × Barra style) ---
+        # ---- Barra exposure (TOPK long-only weight × Barra style) ---
         barra_exposure = None
         if config.barra_exposure_lambda > 0 and not error:
             try:
                 from alpha_gen.core.torch_backend import cs_rank_pct_torch
-                weights = cs_rank_pct_torch(factor, mask=ctx.tradeable()) - 0.5
-                barra = ctx.barra_styles()          # (T, C, 10)
-                exposure = (weights.unsqueeze(2) * barra).nanmean(dim=1)  # (T, 10)
+                tradeable = ctx.tradeable()
+                rank = cs_rank_pct_torch(factor, mask=tradeable)
+                # NaN cells were ignored in ranking — fill with 0 (neutral, excluded from long)
+                rank = torch.where(torch.isfinite(rank), rank, torch.zeros_like(rank))
+                # Long-only: top 50 %  →  weight = rank − 0.5; bottom / NaN → 0
+                long_weight = torch.where(rank >= 0.5, rank - 0.5, torch.zeros_like(rank))
+                # Normalise so sum(long_weight) = 1 per date (portfolio weight)
+                denom = long_weight.sum(dim=1, keepdim=True).clamp(min=1e-12)
+                long_weight = long_weight / denom
+                barra = ctx.barra_styles()               # (T, C, 10)
+                exposure = (long_weight.unsqueeze(2) * barra).sum(dim=1)  # (T, 10)
                 barra_exposure = float(exposure.abs().max(dim=1).values.nanmean().item())
             except Exception:
                 barra_exposure = None
