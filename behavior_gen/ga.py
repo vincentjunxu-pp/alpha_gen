@@ -359,14 +359,16 @@ def evaluate_behavior_gene_on_train(
 
     key = gene_key(gene)
     if key in score_cache:
-        train_s, valid_s, error = score_cache[key]
+        train_s, valid_s, error, cached_barra = score_cache[key]
         return EvaluatedBehaviorGene(
             gene=gene, train_score=train_s, train_metrics=None,
             generation=generation, error=error,
             valid_score=valid_s, valid_metrics=None, passed_validation=None,
+            barra_exposure=cached_barra,
         )
 
     valid_score = None
+    barra_exposure = None
     try:
         factor = calculate_behavior_factor_tensor(
             gene, ctx,
@@ -434,7 +436,7 @@ def evaluate_behavior_gene_on_train(
 
     # train_metrics / valid_metrics always None — NSGA reads from
     # train_score / valid_score (GPU FactorScore).
-    score_cache[key] = (score, valid_score, error)
+    score_cache[key] = (score, valid_score, error, barra_exposure)
     return EvaluatedBehaviorGene(
         gene=gene, train_score=score, train_metrics=None,
         generation=generation, error=error,
