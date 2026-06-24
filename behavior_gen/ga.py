@@ -407,21 +407,24 @@ def evaluate_behavior_gene_on_train(
         if config.barra_exposure_lambda > 0 and not error:
             try:
                 from alpha_gen.core.torch_backend import cs_rank_pct_torch
-                # Orient factor: train_ic learns direction from IC sign;
-                # fixed already pre-multiplied in calculate_behavior_factor_tensor.
-                oriented = factor * score.direction
+                # Direction: avoid materialising oriented= factor * ±1.
+                # rank(-x) ≈ 1 − rank(x), so for direction == -1 flip the rank
+                # instead of the factor — saves one (T, C) tensor allocation.
                 tradeable = ctx.tradeable()
-                rank = cs_rank_pct_torch(oriented, mask=tradeable)
-                # NaN cells were ignored in ranking — fill with 0 (neutral, excluded from long)
+                if score.direction == -1:
+                    rank = 1.0 - cs_rank_pct_torch(factor, mask=tradeable)
+                else:
+                    rank = cs_rank_pct_torch(factor, mask=tradeable)
                 rank = torch.where(torch.isfinite(rank), rank, torch.zeros_like(rank))
-                # Long-only: top 50 %  →  weight = rank − 0.5; bottom / NaN → 0
+                # Long-only TOPK: weight = rank − 0.5 for top 50 %, zero otherwise
                 long_weight = torch.where(rank >= 0.5, rank - 0.5, torch.zeros_like(rank))
-                # Normalise so sum(long_weight) = 1 per date (portfolio weight)
+                del rank  # free (T, C) intermediate
                 denom = long_weight.sum(dim=1, keepdim=True).clamp(min=1e-12)
                 long_weight = long_weight / denom
                 barra = ctx.barra_styles()               # (T, C, 10)
-                exposure = (long_weight.unsqueeze(2) * barra).sum(dim=1)  # (T, 10)
+                exposure = (long_weight.unsqueeze(2) * barra).sum(dim=1)
                 barra_exposure = float(exposure.abs().nanmean().item())
+                del long_weight, barra, exposure, denom
             except Exception:
                 barra_exposure = None
 
