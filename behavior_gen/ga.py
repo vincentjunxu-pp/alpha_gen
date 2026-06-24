@@ -405,8 +405,11 @@ def evaluate_behavior_gene_on_train(
         if config.barra_exposure_lambda > 0 and not error:
             try:
                 from alpha_gen.core.torch_backend import cs_rank_pct_torch
+                # Orient factor: train_ic learns direction from IC sign;
+                # fixed already pre-multiplied in calculate_behavior_factor_tensor.
+                oriented = factor * score.direction
                 tradeable = ctx.tradeable()
-                rank = cs_rank_pct_torch(factor, mask=tradeable)
+                rank = cs_rank_pct_torch(oriented, mask=tradeable)
                 # NaN cells were ignored in ranking — fill with 0 (neutral, excluded from long)
                 rank = torch.where(torch.isfinite(rank), rank, torch.zeros_like(rank))
                 # Long-only: top 50 %  →  weight = rank − 0.5; bottom / NaN → 0
