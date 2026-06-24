@@ -281,8 +281,108 @@ def _rolling_ts_zscore(values: torch.Tensor, window: int, min_periods: int | Non
     return torch.where((counts >= min_periods) & valid & (std > 0), zscore, _nan_like(values))
 
 
+def _rolling_delta(values: torch.Tensor, window: int) -> torch.Tensor:
+    """``values[t] - values[t-window]`` — raw period-over-period change."""
+    if window < 1:
+        raise ValueError("window must be positive")
+    shifted = _nan_like(values)
+    if window < values.shape[0]:
+        shifted[window:] = values[:-window]
+    valid = torch.isfinite(values) & torch.isfinite(shifted)
+    result = values - shifted
+    # first *window* rows have no valid lag
+    valid[:window] = False
+    return torch.where(valid, result, _nan_like(values))
+
+
+def _rolling_vol(values: torch.Tensor, window: int, min_periods: int | None = None, eps: float = 1e-8) -> torch.Tensor:
+    """Rolling standard deviation (volatility).  Reuses the same prefix-sum
+    machinery as :func:`_rolling_ts_zscore`."""
+    if window <= 1:
+        return torch.zeros_like(values)
+    if min_periods is None:
+        min_periods = max(5, window // 3)
+    valid = torch.isfinite(values)
+    x0 = torch.where(valid, values, torch.zeros_like(values))
+    count0 = valid.to(values.dtype)
+    sum0 = torch.cat([torch.zeros((1, values.shape[1]), dtype=values.dtype, device=values.device), x0.cumsum(dim=0)], dim=0)
+    cnt0 = torch.cat([torch.zeros((1, values.shape[1]), dtype=values.dtype, device=values.device), count0.cumsum(dim=0)], dim=0)
+    sq0 = torch.cat(
+        [torch.zeros((1, values.shape[1]), dtype=values.dtype, device=values.device), (x0 * x0).cumsum(dim=0)],
+        dim=0,
+    )
+    end = torch.arange(1, values.shape[0] + 1, device=values.device)
+    start = torch.clamp(end - window, min=0)
+    sums = sum0.index_select(0, end) - sum0.index_select(0, start)
+    counts = cnt0.index_select(0, end) - cnt0.index_select(0, start)
+    sqs = sq0.index_select(0, end) - sq0.index_select(0, start)
+    variance = (sqs - sums * sums / torch.clamp(counts, min=1.0)) / torch.clamp(counts - 1.0, min=1.0)
+    std = torch.sqrt(torch.clamp(variance, min=0.0))
+    return torch.where((counts >= min_periods) & valid & (std > 0), std, _nan_like(values))
+
+
+def _rolling_max_drawdown(values: torch.Tensor, window: int, min_periods: int | None = None, eps: float = 1e-8) -> torch.Tensor:
+    """Max-drawdown over *window*: ``1 − current / rolling_max``.
+    Larger positive → deeper drawdown."""
+    if window < 1:
+        raise ValueError("window must be positive")
+    if min_periods is None:
+        min_periods = max(5, window // 3)
+    valid = torch.isfinite(values)
+    # rolling maximum via unfold
+    windows = values.unfold(0, window, 1)  # (T-win+1, C, win)
+    rolling_max = torch.where(
+        torch.isfinite(windows),
+        windows,
+        torch.full_like(windows, -float("inf")),
+    ).max(dim=2).values  # (T-win+1, C)
+    # pad front with NaN so output shape matches
+    padded = _nan_like(values)
+    if rolling_max.shape[0] > 0:
+        padded[window - 1:] = rolling_max
+    dd = 1.0 - values / torch.clamp(padded, min=eps)
+    enough = torch.isfinite(padded) & (padded > eps)
+    return torch.where(valid & enough, dd, _nan_like(values))
+
+
+def _decay_linear(values: torch.Tensor, window: int, min_periods: int | None = None) -> torch.Tensor:
+    """Decay-linear weighted average over *window* (recency-weighted)."""
+    if window < 1:
+        raise ValueError("window must be positive")
+    if min_periods is None:
+        min_periods = window
+    valid = torch.isfinite(values)
+    values0 = torch.where(valid, values, torch.zeros_like(values))
+    valid0 = valid.to(values.dtype)
+    # time-weight vector: 1..T as column
+    time_weight = torch.arange(1, values.shape[0] + 1, dtype=values.dtype, device=values.device).unsqueeze(1)
+    zeros = torch.zeros((1, values.shape[1]), dtype=values.dtype, device=values.device)
+    end = torch.arange(1, values.shape[0] + 1, device=values.device)
+    start = torch.clamp(end - window, min=0)
+
+    def _windowed(source: torch.Tensor) -> torch.Tensor:
+        prefix = torch.cat([zeros, source.cumsum(dim=0)], dim=0)
+        return prefix.index_select(0, end) - prefix.index_select(0, start)
+
+    raw_sum = _windowed(values0)
+    raw_count = _windowed(valid0)
+    weighted_sum = _windowed(values0 * time_weight) - start.unsqueeze(1).to(values.dtype) * raw_sum
+    weighted_count = _windowed(valid0 * time_weight) - start.unsqueeze(1).to(values.dtype) * raw_count
+    decayed = weighted_sum / torch.clamp(weighted_count, min=1.0)
+    return torch.where(valid & (raw_count >= min_periods), decayed, _nan_like(values))
+
+
 def _center_rank(values: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
-    return cs_rank_pct_torch(values, mask=mask) - 0.5
+    """Cross-sectional rank percentile centred at zero.
+
+    NaN cells are ignored during ranking and later filled with 0
+    (neutral — no directional exposure).  This prevents NaN from
+    propagating through multiplicative combiners like ``confirm`` or
+    ``crowding_interaction``.
+    """
+    ranked = cs_rank_pct_torch(values, mask=mask)
+    centered = ranked - 0.5
+    return torch.where(torch.isfinite(centered), centered, torch.zeros_like(centered))
 
 
 def _feature(field_name: str, unary_op: str, ctx: BehaviorTorchContext, mask: torch.Tensor | None) -> torch.Tensor:
@@ -294,18 +394,27 @@ def _feature(field_name: str, unary_op: str, ctx: BehaviorTorchContext, mask: to
         value = _center_rank(raw, mask=mask)
     elif unary_op == "zscore":
         value = cs_zscore_torch(raw, mask=mask)
-    elif unary_op == "direction_rank":
-        value = _center_rank(raw, mask=mask) * float(rule.direction)
-    elif unary_op == "direction_zscore":
-        value = cs_zscore_torch(raw, mask=mask) * float(rule.direction)
     elif unary_op == "ind_rank_pct":
         value = industry_rank_pct_torch(raw, ctx.industry_codes(), mask=mask) - 0.5
+        value = torch.where(torch.isfinite(value), value, torch.zeros_like(value))  # NaN → 0 neutral
     elif unary_op == "ind_zscore":
         value = industry_zscore_torch(raw, ctx.industry_codes(), mask=mask)
     elif unary_op == "ts_zscore_5d":
         value = _rolling_ts_zscore(raw, 5)
     elif unary_op == "ts_zscore_20d":
         value = _rolling_ts_zscore(raw, 20)
+    elif unary_op == "ts_delta_5d":
+        value = _rolling_delta(raw, 5)
+    elif unary_op == "ts_delta_20d":
+        value = _rolling_delta(raw, 20)
+    elif unary_op == "ts_vol_20d":
+        value = _rolling_vol(raw, 20)
+    elif unary_op == "ts_max_dd_20d":
+        value = _rolling_max_drawdown(raw, 20)
+    elif unary_op == "ts_max_dd_60d":
+        value = _rolling_max_drawdown(raw, 60)
+    elif unary_op == "decay_linear_20d":
+        value = _decay_linear(raw, 20)
     else:
         raise ValueError(f"unknown unary op: {unary_op!r}")
     return _apply_mask(value, mask) if mask is not None else value
@@ -351,6 +460,31 @@ def _condition_mask(condition: ConditionGene, ctx: BehaviorTorchContext, base_ma
         return value > 0
     if condition.condition_op == "negative":
         return value < 0
+    if condition.condition_op == "extreme_tail":
+        rank = cs_rank_pct_torch(value, mask=base_mask)
+        return (rank >= 0.97) | (rank <= 0.03)
+    if condition.condition_op == "vol_breakout":
+        # |value - rolling_mean(20)| > 2 * rolling_std(20)
+        valid = torch.isfinite(value)
+        x0 = torch.where(valid, value, torch.zeros_like(value))
+        count0 = valid.to(value.dtype)
+        sum0 = torch.cat([torch.zeros((1, value.shape[1]), dtype=value.dtype, device=value.device), x0.cumsum(dim=0)], dim=0)
+        cnt0 = torch.cat([torch.zeros((1, value.shape[1]), dtype=value.dtype, device=value.device), count0.cumsum(dim=0)], dim=0)
+        sq0 = torch.cat(
+            [torch.zeros((1, value.shape[1]), dtype=value.dtype, device=value.device), (x0 * x0).cumsum(dim=0)],
+            dim=0,
+        )
+        w = 20
+        end = torch.arange(1, value.shape[0] + 1, device=value.device)
+        start = torch.clamp(end - w, min=0)
+        sums = sum0.index_select(0, end) - sum0.index_select(0, start)
+        counts = cnt0.index_select(0, end) - cnt0.index_select(0, start)
+        sqs = sq0.index_select(0, end) - sq0.index_select(0, start)
+        mu = sums / torch.clamp(counts, min=1.0)
+        variance = (sqs - sums * sums / torch.clamp(counts, min=1.0)) / torch.clamp(counts - 1.0, min=1.0)
+        sigma = torch.sqrt(torch.clamp(variance, min=0.0))
+        deviation = torch.abs(value - mu)
+        return (counts >= 5) & valid & (sigma > 1e-8) & (deviation > 2.0 * sigma)
     raise ValueError(f"unknown condition op: {condition.condition_op!r}")
 
 
@@ -392,7 +526,7 @@ def _combine_behavior_gene(gene: BehaviorGene, values: Mapping[str, torch.Tensor
     if not ordered:
         raise ValueError(f"gene {gene.mode!r} has no slot values")
 
-    if gene.combiner in {"rank_gap", "gated_rank_gap"}:
+    if gene.combiner == "rank_gap":
         if len(ordered) < 2:
             raise ValueError(f"{gene.combiner} requires at least two slot values")
         raw = ordered[0] - ordered[1]
@@ -408,20 +542,35 @@ def _combine_behavior_gene(gene: BehaviorGene, values: Mapping[str, torch.Tensor
         raw = values["growth_anchor"] * values["crowding_signal"]
         if "fund_support" in values:
             raw = raw - 0.5*values["fund_support"]
-    elif gene.combiner in {"confirm", "gated_confirm"}:
+    elif gene.combiner == "confirm":
         if len(ordered) < 2:
             raise ValueError(f"{gene.combiner} requires at least two slot values")
         raw = ordered[0] + ordered[1] + ordered[0] * ordered[1]
+        # core slots = first two slots in mode definition order that have values.
+        # Dynamic instead of hardcoded so new modes get correct weights.
+        mode_spec = MODE_REGISTRY[gene.mode]
+        ordered_names = [name for name in mode_spec.slots if name in values]
+        core_slots = set(ordered_names[:2])
         for name, value in values.items():
-            if name in {"fund_anchor", "flow_confirm", "price_anchor", "price_momentum"}:
+            if name in core_slots:
                 continue
             if name.endswith("control"):
                 raw = raw - 0.25 * value.abs()
             else:
                 raw = raw + 0.5 * value
     elif gene.combiner == "risk_minus_confirm":
-        risk_names = {"price_momentum", "retail_flow", "close_chase", "attention_heat", "crowding_signal", "liquidity_stress", "turnover_shock"}
-        confirm_names = {"large_flow", "flow_confirm", "fund_support", "orderbook_filter"}
+        risk_names = {
+            "price_momentum", "retail_flow", "close_chase", "attention_heat",
+            "crowding_signal", "liquidity_stress", "turnover_shock",
+            # ── new slots (microstructure / volatility / sentiment) ──
+            "spread_stress", "depth_drain", "imbalance_divergence",
+            "volatility_shock", "sentiment_energy",
+        }
+        confirm_names = {
+            "large_flow", "flow_confirm", "fund_support", "orderbook_filter",
+            # ── new slots ──
+            "volume_confirm", "institution_flow", "earnings_accel",
+        }
         risk_items = [value for name, value in values.items() if name in risk_names]
         confirm_items = [value for name, value in values.items() if name in confirm_names]
         risk = _sum_existing(risk_items, ctx)
@@ -469,8 +618,6 @@ def _combine_behavior_gene(gene: BehaviorGene, values: Mapping[str, torch.Tensor
     else:
         raise ValueError(f"unknown combiner: {gene.combiner!r}")
 
-    if gene.combiner.startswith("gated"):
-        raw = _apply_conditions(raw, gene, ctx, mask)
     return raw
 
 
@@ -546,7 +693,7 @@ def calculate_behavior_factor_tensor(
     tradeable_mask = ctx.tradeable() if tradeable_only else None
     values = _slot_values(gene, ctx, tradeable_mask)
     raw = _combine_behavior_gene(gene, values, ctx, tradeable_mask)
-    raw = _apply_conditions(raw, gene, ctx, tradeable_mask) if not gene.combiner.startswith("gated") else raw
+    raw = _apply_conditions(raw, gene, ctx, tradeable_mask)
 
     if apply_mode_direction and gene.direction_policy == "fixed":
         raw = raw * float(MODE_REGISTRY[gene.mode].direction)

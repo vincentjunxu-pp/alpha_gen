@@ -10,22 +10,24 @@ UNARY_OP_CHOICES = (
     "current",
     "rank_pct",
     "zscore",
-    "direction_rank",
-    "direction_zscore",
     "ind_rank_pct",
     "ind_zscore",
     "ts_zscore_5d",
     "ts_zscore_20d",
+    "ts_delta_5d",
+    "ts_delta_20d",
+    "ts_vol_20d",
+    "ts_max_dd_20d",
+    "ts_max_dd_60d",
+    "decay_linear_20d",
 )
 
 COMBINER_CHOICES = (
     "rank_gap",
     "residual_gap",
-    "gated_rank_gap",
     "quality_gap",
     "crowding_interaction",
     "confirm",
-    "gated_confirm",
     "risk_minus_confirm",
     "panic_reversal",
     "attention_risk",
@@ -41,6 +43,9 @@ CONDITION_OP_CHOICES = (
     "below_median",
     "positive",
     "negative",
+    # ── 2 new segmentation / breakout ops ──
+    "extreme_tail",
+    "vol_breakout",
 )
 
 DIRECTION_POLICIES = ("fixed", "train_ic", "regime_switch")
@@ -217,7 +222,7 @@ MODE_REGISTRY: dict[str, ModeSpec] = {
             "fund_anchor": _slot("fund_anchor", ("fundamental",), ("anchor", "growth", "quality", "support")),
             "price_reaction": _slot("price_reaction", ("price_volume",), ("reaction", "momentum")),
         },
-        allowed_combiners=("rank_gap", "residual_gap", "gated_rank_gap"),
+        allowed_combiners=("rank_gap", "residual_gap"),
         default_combiner="rank_gap",
         direction=1,
         allowed_condition_roles=("attention", "crowding", "liquidity", "open_intent"),
@@ -230,7 +235,7 @@ MODE_REGISTRY: dict[str, ModeSpec] = {
             "cashflow_quality": _slot("cashflow_quality", ("fundamental",), ("quality", "cashflow_quality")),
             "price_reaction": _slot("price_reaction", ("price_volume",), ("reaction", "attention"), required=False),
         },
-        allowed_combiners=("quality_gap", "rank_gap", "gated_rank_gap"),
+        allowed_combiners=("quality_gap", "rank_gap"),
         default_combiner="quality_gap",
         direction=-1,
         allowed_condition_roles=("attention", "crowding"),
@@ -257,7 +262,7 @@ MODE_REGISTRY: dict[str, ModeSpec] = {
             "orderbook_filter": _slot("orderbook_filter", ("orderbook",), ("open_intent", "confirmation", "buy_pressure"), required=False),
             "price_control": _slot("price_control", ("price_volume",), ("reaction", "momentum"), required=False),
         },
-        allowed_combiners=("confirm", "gated_confirm", "residual_gap"),
+        allowed_combiners=("confirm", "residual_gap"),
         default_combiner="confirm",
         direction=1,
         allowed_condition_roles=("open_intent", "liquidity", "crowding"),
@@ -297,11 +302,11 @@ MODE_REGISTRY: dict[str, ModeSpec] = {
         name="attention_overreaction",
         description="极端收益、成交异常或过热关注造成短期过度反应。",
         slots={
-            "attention_heat": _slot("attention_heat", ("price_volume",), ("attention", "overreaction", "lottery")),
+            "attention_heat": _slot("attention_heat", ("price_volume",), ("attention", "overreaction", "lottery", "lottery_attention")),
             "price_momentum": _slot("price_momentum", ("price_volume",), ("momentum", "reaction"), required=False),
             "fund_support": _slot("fund_support", ("fundamental",), ("support", "quality", "valuation"), required=False),
         },
-        allowed_combiners=("attention_risk", "risk_minus_confirm", "gated_rank_gap"),
+        allowed_combiners=("attention_risk", "risk_minus_confirm"),
         default_combiner="attention_risk",
         direction=-1,
         allowed_condition_roles=("attention", "crowding", "volatility"),
@@ -341,7 +346,7 @@ MODE_REGISTRY: dict[str, ModeSpec] = {
             "flow_confirm": _slot("flow_confirm", ("moneyflow",), ("large_flow", "confirmation"), required=False),
             "orderbook_filter": _slot("orderbook_filter", ("orderbook",), ("open_intent", "confirmation"), required=False),
         },
-        allowed_combiners=("anchor_confirm", "confirm", "gated_confirm"),
+        allowed_combiners=("anchor_confirm", "confirm"),
         default_combiner="anchor_confirm",
         direction=1,
         allowed_condition_roles=("open_intent", "crowding", "liquidity"),
@@ -355,6 +360,33 @@ MODE_REGISTRY: dict[str, ModeSpec] = {
             "fund_support": _slot("fund_support", ("fundamental",), ("quality", "support"), required=False),
         },
         allowed_combiners=("residual_gap", "rank_gap", "anchor_confirm"),
+        default_combiner="residual_gap",
+        direction=1,
+        allowed_condition_roles=("attention", "crowding"),
+    ),
+    # ── 2 new modes ──
+    "microstructure_deterioration": ModeSpec(
+        name="microstructure_deterioration",
+        description="盘口微观结构恶化：价差扩大、深度衰减、买卖失衡加剧。",
+        slots={
+            "spread_stress": _slot("spread_stress", ("orderbook",), ("spread", "stress", "liquidity")),
+            "depth_drain": _slot("depth_drain", ("orderbook",), ("liquidity", "orderbook_pressure")),
+            "imbalance_divergence": _slot("imbalance_divergence", ("orderbook",), ("buy_pressure", "close_chase", "open_intent"), required=False),
+        },
+        allowed_combiners=("risk_minus_confirm", "rank_gap"),
+        default_combiner="rank_gap",
+        direction=-1,
+        allowed_condition_roles=("volatility", "crowding", "liquidity"),
+    ),
+    "earnings_surprise_drift": ModeSpec(
+        name="earnings_surprise_drift",
+        description="盈余加速度（代理意外）后价格反应不足，滞后补涨。",
+        slots={
+            "earnings_accel": _slot("earnings_accel", ("fundamental",), ("growth", "anchor", "fundamental_update")),
+            "price_reaction": _slot("price_reaction", ("price_volume",), ("reaction", "underreaction")),
+            "institution_flow": _slot("institution_flow", ("moneyflow",), ("large_flow", "confirmation", "institutional_flow"), required=False),
+        },
+        allowed_combiners=("rank_gap", "residual_gap", "confirm"),
         default_combiner="residual_gap",
         direction=1,
         allowed_condition_roles=("attention", "crowding"),
@@ -502,7 +534,7 @@ def validate_gene(gene: BehaviorGene, field_rules: Mapping[str, BehaviorFieldRul
         errors.append(f"unknown combiner: {gene.combiner!r}")
     elif gene.combiner not in mode_spec.allowed_combiners:
         errors.append(f"combiner {gene.combiner!r} is not allowed for mode {gene.mode!r}")
-    elif gene.combiner in {"rank_gap", "residual_gap", "gated_rank_gap", "confirm", "gated_confirm"}:
+    elif gene.combiner in {"rank_gap", "residual_gap", "confirm"}:
         n_selected_slots = len([name for name in gene.slots if name in mode_spec.slots])
         if n_selected_slots < 2:
             errors.append(f"combiner {gene.combiner!r} requires at least two selected slots")
@@ -613,10 +645,6 @@ def _feature_formula(field: str, unary_op: str) -> str:
         return f"(CS_RANK_PCT({field}) - 0.5)"
     if unary_op == "zscore":
         return f"CS_ZSCORE({field})"
-    if unary_op == "direction_rank":
-        return f"(FIELD_DIRECTION({field}) * (CS_RANK_PCT({field}) - 0.5))"
-    if unary_op == "direction_zscore":
-        return f"(FIELD_DIRECTION({field}) * CS_ZSCORE({field}))"
     if unary_op == "ind_rank_pct":
         return f"(INDUSTRY_RANK_PCT({field}) - 0.5)"
     if unary_op == "ind_zscore":
@@ -625,6 +653,18 @@ def _feature_formula(field: str, unary_op: str) -> str:
         return f"TS_ZSCORE({field}, 5)"
     if unary_op == "ts_zscore_20d":
         return f"TS_ZSCORE({field}, 20)"
+    if unary_op == "ts_delta_5d":
+        return f"({field} - DELAY({field}, 5))"
+    if unary_op == "ts_delta_20d":
+        return f"({field} - DELAY({field}, 20))"
+    if unary_op == "ts_vol_20d":
+        return f"TS_STD({field}, 20)"
+    if unary_op == "ts_max_dd_20d":
+        return f"MAX_DRAWDOWN({field}, 20)"
+    if unary_op == "ts_max_dd_60d":
+        return f"MAX_DRAWDOWN({field}, 60)"
+    if unary_op == "decay_linear_20d":
+        return f"DECAY_LINEAR({field}, 20)"
     return f"{unary_op}({field})"
 
 
@@ -642,6 +682,10 @@ def _condition_formula(condition: ConditionGene) -> str:
         return f"({value} > 0)"
     if condition.condition_op == "negative":
         return f"({value} < 0)"
+    if condition.condition_op == "extreme_tail":
+        return f"(CS_RANK_PCT({value}) >= 0.97 OR CS_RANK_PCT({value}) <= 0.03)"
+    if condition.condition_op == "vol_breakout":
+        return f"(ABS({value} - TS_MEAN({value}, 20)) > 2 * TS_STD({value}, 20))"
     return f"{condition.condition_op}({value}, {condition.threshold:g})"
 
 
@@ -660,7 +704,7 @@ def _combiner_formula(gene: BehaviorGene) -> str:
     ordered = [name for name in mode_spec.slots if name in gene.slots]
     values = set(gene.slots)
 
-    if gene.combiner in {"rank_gap", "gated_rank_gap"}:
+    if gene.combiner in {"rank_gap"}:
         return f"({ordered[0]} - {ordered[1]})"
     if gene.combiner == "residual_gap":
         return f"CS_RESIDUAL(y={ordered[0]}, x={ordered[1]})"
@@ -674,7 +718,7 @@ def _combiner_formula(gene: BehaviorGene) -> str:
         if "fund_support" in values:
             formula = f"({formula} - 0.5 * fund_support)"
         return formula
-    if gene.combiner in {"confirm", "gated_confirm"}:
+    if gene.combiner == "confirm":
         formula = f"({ordered[0]} + {ordered[1]} + {ordered[0]} * {ordered[1]})"
         for name in gene.slots:
             if name in {"fund_anchor", "flow_confirm", "price_anchor", "price_momentum"}:
