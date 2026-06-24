@@ -74,6 +74,7 @@ class BehaviorGAConfig:
     sampler_config: BehaviorSamplerConfig = field(default_factory=BehaviorSamplerConfig)
     neutralization_mode: str = NEUTRALIZATION_RAW_FULL_BARRA_INDUSTRY
     size_field: str = "barra_size"
+    barra_exposure_lambda: float = 0.0
     require_cuda: bool = True
     show_progress: bool = False
 
@@ -100,6 +101,8 @@ class BehaviorGAConfig:
             raise ValueError(
                 f"neutralization_mode must be one of {BEHAVIOR_NEUTRALIZATION_MODES}"
             )
+        if not 0.0 <= self.barra_exposure_lambda <= 1.0:
+            raise ValueError("barra_exposure_lambda must be in [0, 1]")
 
 
 @dataclass(frozen=True)
@@ -125,6 +128,7 @@ class EvaluatedBehaviorGene:
     valid_score: FactorScore | None = None
     valid_metrics: object | None = None   # always None — all metrics on GPU
     passed_validation: bool | None = None
+    barra_exposure: float | None = None   # max │w · Barra_k│, averaged over time
 
     def objectives(self, objective_mode: str) -> tuple[float, ...]:
         """Return configured maximization objectives from GPU train score.
@@ -396,6 +400,18 @@ def evaluate_behavior_gene_on_train(
                 if not error:
                     error = f"valid {type(exc).__name__}: {exc}"
 
+        # ---- Barra exposure (long-short weight × Barra style) ---
+        barra_exposure = None
+        if config.barra_exposure_lambda > 0 and not error:
+            try:
+                from alpha_gen.core.torch_backend import cs_rank_pct_torch
+                weights = cs_rank_pct_torch(factor, mask=ctx.tradeable()) - 0.5
+                barra = ctx.barra_styles()          # (T, C, 10)
+                exposure = (weights.unsqueeze(2) * barra).nanmean(dim=1)  # (T, 10)
+                barra_exposure = float(exposure.abs().max(dim=1).values.nanmean().item())
+            except Exception:
+                barra_exposure = None
+
         # ---- GPU memory cleanup ---------------------------------
         del factor
         if ctx.device.type == "cuda":
@@ -413,6 +429,7 @@ def evaluate_behavior_gene_on_train(
         generation=generation, error=error,
         valid_score=valid_score, valid_metrics=None,
         passed_validation=None,
+        barra_exposure=barra_exposure,
     )
 
 
@@ -564,13 +581,15 @@ def run_behavior_ga_search(
         history.extend(evaluated_offspring)
 
         combined = _deduplicate_evaluated(evaluated_population + evaluated_offspring)
-        selected_idx = nsga2_select(
-            [
-                item.objectives(config.nsga_objective_mode)
-                for item in combined
-            ],
-            config.population_size,
-        )
+        objectives_list: list[tuple[float, ...]] = []
+        for item in combined:
+            obj = list(item.objectives(config.nsga_objective_mode))
+            if config.barra_exposure_lambda > 0 and item.barra_exposure is not None and item.barra_exposure > 0:
+                # penalised RIR = RIR × (1 − λ × max_barra_exposure)
+                penalty = config.barra_exposure_lambda * item.barra_exposure
+                obj[0] = obj[0] * max(0.0, 1.0 - penalty)
+            objectives_list.append(tuple(obj))
+        selected_idx = nsga2_select(objectives_list, config.population_size)
         evaluated_population = [combined[idx] for idx in selected_idx]
 
     return BehaviorSearchResult(config=config, final_population=evaluated_population, history=history)
@@ -829,6 +848,7 @@ def evaluated_behavior_to_frame(
             valid_values = {key: np.nan for key in _metrics_from_score(_empty_score())}
         row.update({f"valid_{key}": value for key, value in valid_values.items()})
         row["passed_validation"] = item.passed_validation
+        row["barra_exposure"] = item.barra_exposure
 
         rows.append(row)
 
