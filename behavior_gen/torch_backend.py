@@ -329,19 +329,14 @@ def _rolling_max_drawdown(values: torch.Tensor, window: int, min_periods: int | 
     if min_periods is None:
         min_periods = max(5, window // 3)
     valid = torch.isfinite(values)
-    # rolling maximum via unfold
-    windows = values.unfold(0, window, 1)  # (T-win+1, C, win)
-    rolling_max = torch.where(
-        torch.isfinite(windows),
-        windows,
-        torch.full_like(windows, -float("inf")),
-    ).max(dim=2).values  # (T-win+1, C)
-    # pad front with NaN so output shape matches
-    padded = _nan_like(values)
-    if rolling_max.shape[0] > 0:
-        padded[window - 1:] = rolling_max
-    dd = 1.0 - values / torch.clamp(padded, min=eps)
-    enough = torch.isfinite(padded) & (padded > eps)
+    # Use max_pool1d instead of unfold — O(window × T × C) → O(T × C)
+    import torch.nn.functional as F  # noqa: E402 (fine at call-site)
+    # max_pool1d expects (N, C, L) → (C, 1, T)
+    v = values.T.unsqueeze(1)  # (C, 1, T)
+    v_pad = F.pad(v, (window - 1, 0), mode="constant", value=float("-inf"))
+    rolling_max = F.max_pool1d(v_pad, kernel_size=window, stride=1).squeeze(1).T  # (T, C)
+    dd = 1.0 - values / torch.clamp(rolling_max, min=eps)
+    enough = rolling_max > eps
     return torch.where(valid & enough, dd, _nan_like(values))
 
 
