@@ -753,12 +753,16 @@ def select_validation_population(
     population_size: int,
     *,
     nsga_objective_mode: str = NSGA_MODE_RIR_LONG_RIR_NEUTRALIZED_RIR,
+    barra_exposure_lambda: float = 0.0,
 ) -> list[EvaluatedBehaviorGene]:
     """Run NSGA‑II on validation GPU scores to select the final population.
 
     Reads objectives directly from ``valid_score`` (:class:`FactorScore`).
     Genes whose evaluation errored or whose *valid_score* is ``None`` are
     excluded.
+
+    When *barra_exposure_lambda* > 0 the same TOPK Barra-exposure penalty
+    that was applied during training is also applied to the validation RIR.
     """
 
     if nsga_objective_mode not in NSGA_OBJECTIVE_MODES:
@@ -783,13 +787,16 @@ def select_validation_population(
     if len(clean) <= population_size:
         return clean
 
-    objectives = [
-        tuple(
+    objectives: list[tuple[float, ...]] = []
+    for item in clean:
+        obj = list(
             float(getattr(item.valid_score, _NAME_MAP[name]))
             for name in objective_names
         )
-        for item in clean
-    ]
+        if barra_exposure_lambda > 0 and item.barra_exposure is not None and item.barra_exposure > 0:
+            penalty = barra_exposure_lambda * item.barra_exposure
+            obj[0] = obj[0] * max(0.0, 1.0 - penalty)
+        objectives.append(tuple(obj))
     selected_idx = nsga2_select(objectives, population_size)
     return [clean[idx] for idx in selected_idx]
 

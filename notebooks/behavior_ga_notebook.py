@@ -307,6 +307,7 @@ final_population = select_validation_population(
     validated_all,
     population_size=config.population_size,
     nsga_objective_mode=config.nsga_objective_mode,
+    barra_exposure_lambda=config.barra_exposure_lambda,
 )
 result.final_population = final_population
 print(f"NSGA 精选: {len(final_population)} 个基因")
